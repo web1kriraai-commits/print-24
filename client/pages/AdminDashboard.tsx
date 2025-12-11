@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ReviewFilterDropdown } from "../components/ReviewFilterDropdown";
-import CKEditor from "../components/CKEditor";
+import RichTextEditor from "../components/RichTextEditor";
 import { formatCurrency, calculateOrderBreakdown, OrderForCalculation } from "../utils/pricing";
 import { API_BASE_URL_WITH_API as API_BASE_URL } from "../lib/apiConfig";
 import { scrollToInvalidField } from "../lib/validationUtils";
@@ -954,7 +954,6 @@ const AdminDashboard: React.FC = () => {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
-      "ngrok-skip-browser-warning": "true",
     };
     
     if (includeContentType) {
@@ -968,13 +967,9 @@ const AdminDashboard: React.FC = () => {
   const handleNgrokResponse = async (response: Response) => {
     const text = await response.text();
     
-    // Check if response is HTML (could be error page or ngrok warning)
+    // Check if response is HTML (could be error page)
     if (text.trim().startsWith("<!DOCTYPE") || text.trim().startsWith("<html")) {
-      // Check if it's specifically an ngrok warning
-      if (text.includes("ngrok") || text.includes("Ngrok")) {
-        throw new Error("Ngrok blocked request. Please try again or check your Ngrok configuration. Make sure the ngrok-skip-browser-warning header is included.");
-      }
-      // Otherwise it's likely a server error page
+      // It's likely a server error page
       throw new Error(`Server returned HTML instead of JSON. Status: ${response.status} ${response.statusText}`);
     }
     
@@ -5209,11 +5204,11 @@ const AdminDashboard: React.FC = () => {
                       <div className="group relative">
                         <Info size={14} className="text-cream-500 cursor-help" />
                         <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block z-10 w-64 p-2 bg-cream-900 text-white text-xs rounded-lg shadow-lg">
-                          Detailed product description that customers will see. Use formatting to make it readable and professional. You can insert images and links using the toolbar buttons.
+                          Detailed product description that customers will see. Use formatting to make it readable and professional. You can insert images using the toolbar buttons.
                         </div>
                       </div>
                     </label>
-                    <CKEditor
+                    <RichTextEditor
                       value={productForm.description}
                       onChange={(html) =>
                         setProductForm({
@@ -5221,14 +5216,16 @@ const AdminDashboard: React.FC = () => {
                           description: html,
                         })
                       }
-                      placeholder="Enter product description. Use the toolbar to format text, insert images, links, and more."
+                      placeholder="Enter product description. Use the toolbar to format text, insert images, and more."
                     />
                     <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-xs font-medium text-blue-900 mb-1">💡 CKEditor Features:</p>
+                      <p className="text-xs font-medium text-blue-900 mb-1">💡 Rich Text Editor Features:</p>
                       <ul className="text-xs text-blue-800 space-y-1 list-disc list-inside">
-                        <li>Format text with <strong>bold</strong>, <em>italic</em>, underline, and more</li>
-                        <li>Insert images and links using the toolbar buttons</li>
-                        <li>Create lists, tables, and embed media (YouTube, etc.)</li>
+                        <li>Format text with <strong>bold</strong>, <em>italic</em>, underline, strikethrough</li>
+                        <li>Change font family, font size, and text colors</li>
+                        <li>Insert images using the toolbar button</li>
+                        <li>Create ordered and bullet lists with indentation</li>
+                        <li>Align text (left, center, right, justify)</li>
                         <li>All formatting is preserved when saved</li>
                       </ul>
                     </div>

@@ -60,7 +60,7 @@ export const sendAccountCreationEmail = async (userEmail, userName, tempPassword
               <div class="password-box">${tempPassword}</div>
               <p><strong>Important:</strong> Please change your password after logging in for security purposes.</p>
               <p>You can now log in to your account and track your orders.</p>
-              <a href="${process.env.FRONTEND_URL || 'https://nonprohibitory-katheryn-unbewitched.ngrok-free.dev'}/login" class="button">Login to Your Account</a>
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5000'}/login" class="button">Login to Your Account</a>
               <div class="footer">
                 <p>If you have any questions, please don't hesitate to contact us.</p>
                 <p>Best regards,<br>The Print24 Team</p>
@@ -84,7 +84,7 @@ export const sendAccountCreationEmail = async (userEmail, userName, tempPassword
         Important: Please change your password after logging in for security purposes.
         
         You can now log in to your account and track your orders.
-        Login URL: ${process.env.FRONTEND_URL || 'https://nonprohibitory-katheryn-unbewitched.ngrok-free.dev'}/login
+        Login URL: ${process.env.FRONTEND_URL || 'http://localhost:5000'}/login
         
         If you have any questions, please don't hesitate to contact us.
         
@@ -150,7 +150,7 @@ export const sendOrderConfirmationEmail = async (userEmail, userName, orderNumbe
                 <p><strong>Status:</strong> ${orderDetails.status || 'Request'}</p>
               </div>
               <p>You can track your order status by logging into your account.</p>
-              <a href="${process.env.FRONTEND_URL || 'https://nonprohibitory-katheryn-unbewitched.ngrok-free.dev'}/profile" class="button">View My Orders</a>
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5000'}/profile" class="button">View My Orders</a>
               <div class="footer">
                 <p>If you have any questions about your order, please contact us.</p>
                 <p>Best regards,<br>The Print24 Team</p>
@@ -175,7 +175,7 @@ export const sendOrderConfirmationEmail = async (userEmail, userName, orderNumbe
         Status: ${orderDetails.status || 'Request'}
         
         You can track your order status by logging into your account.
-        View Orders: ${process.env.FRONTEND_URL || 'https://nonprohibitory-katheryn-unbewitched.ngrok-free.dev'}/profile
+        View Orders: ${process.env.FRONTEND_URL || 'http://localhost:5000'}/profile
         
         If you have any questions about your order, please contact us.
         

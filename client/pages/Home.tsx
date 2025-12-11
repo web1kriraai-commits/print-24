@@ -187,7 +187,6 @@ const Home: React.FC = () => {
         const BASE_URL = API_BASE_URL_WITH_API;
         const headers = {
           Accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
         };
 
         // Fetch Digital Categories
@@ -269,7 +268,6 @@ const Home: React.FC = () => {
         const BASE_URL = API_BASE_URL_WITH_API;
         const headers = {
           Accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
         };
 
         const response = await fetch(`${BASE_URL}/reviews`, {

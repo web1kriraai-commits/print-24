@@ -134,7 +134,6 @@ const DigitalPrint: React.FC = () => {
 
         const headers = {
           Accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
         };
 
         // Fetch Digital Categories

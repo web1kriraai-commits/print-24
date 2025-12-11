@@ -110,7 +110,6 @@ const VisitingCards: React.FC = () => {
               method: "GET",
               headers: {
                 Accept: "application/json",
-                "ngrok-skip-browser-warning": "true",
               },
             });
 
@@ -126,7 +125,6 @@ const VisitingCards: React.FC = () => {
                   method: "GET",
                   headers: {
                     Accept: "application/json",
-                    "ngrok-skip-browser-warning": "true",
                   },
                 });
                 
@@ -197,7 +195,6 @@ const VisitingCards: React.FC = () => {
                     method: "GET",
                     headers: {
                       Accept: "application/json",
-                      "ngrok-skip-browser-warning": "true",
                     },
                   });
                   
@@ -402,7 +399,6 @@ const VisitingCards: React.FC = () => {
                   method: "GET",
                   headers: {
                     Accept: "application/json",
-                    "ngrok-skip-browser-warning": "true",
                   },
                 });
                 
@@ -446,7 +442,6 @@ const VisitingCards: React.FC = () => {
                 method: "GET",
                 headers: {
                   Accept: "application/json",
-                  "ngrok-skip-browser-warning": "true",
                 },
               });
               
@@ -488,7 +483,6 @@ const VisitingCards: React.FC = () => {
                 method: "GET",
                 headers: {
                   Accept: "application/json",
-                  "ngrok-skip-browser-warning": "true",
                 },
               });
               
@@ -521,7 +515,6 @@ const VisitingCards: React.FC = () => {
                     method: "GET",
                     headers: {
                       Accept: "application/json",
-                      "ngrok-skip-browser-warning": "true",
                     },
                   });
                   
@@ -554,7 +547,6 @@ const VisitingCards: React.FC = () => {
                       method: "GET",
                       headers: {
                         Accept: "application/json",
-                        "ngrok-skip-browser-warning": "true",
                       },
                     });
                     
@@ -698,7 +690,6 @@ const VisitingCards: React.FC = () => {
                   method: "GET",
                   headers: {
                     Accept: "application/json",
-                    "ngrok-skip-browser-warning": "true",
                   },
                 });
                 if (categoryResponse.ok) {
@@ -788,7 +779,6 @@ const VisitingCards: React.FC = () => {
             method: "GET",
             headers: {
               Accept: "application/json",
-              "ngrok-skip-browser-warning": "true",
             },
           });
 

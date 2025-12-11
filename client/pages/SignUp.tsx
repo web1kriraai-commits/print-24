@@ -79,7 +79,6 @@ const SignUp: React.FC = () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "ngrok-skip-browser-warning": "true", // <--- IMPORTANT
           },
           body: JSON.stringify({
             name: formData.name,

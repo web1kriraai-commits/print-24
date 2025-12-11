@@ -48,16 +48,13 @@ app.use(
         "http://localhost:5000",
         "http://127.0.0.1:5000",
         "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
-        "https://nonprohibitory-katheryn-unbewitched.ngrok-free.dev"
+        "http://127.0.0.1:5173"
       ];
       
-      // Allow if origin is in the list or if it's a localhost/127.0.0.1 origin or ngrok
+      // Allow if origin is in the list or if it's a localhost/127.0.0.1 origin
       if (allowedOrigins.includes(origin) || 
           origin.startsWith("http://localhost:") || 
-          origin.startsWith("http://127.0.0.1:") ||
-          origin.includes("ngrok-free.dev") ||
-          origin.includes("ngrok.io")) {
+          origin.startsWith("http://127.0.0.1:")) {
         callback(null, true);
       } else {
         // For development, allow all origins
@@ -73,8 +70,7 @@ app.use(
       "X-Requested-With",
       "Access-Control-Allow-Origin",
       "Access-Control-Allow-Headers",
-      "Access-Control-Allow-Methods",
-      "ngrok-skip-browser-warning"
+      "Access-Control-Allow-Methods"
     ],
     exposedHeaders: [
       "Content-Type",
