@@ -354,6 +354,8 @@ const AdminDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  // Field-level errors for product form
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryImage, setEditingCategoryImage] = useState<string | null>(null);
 
@@ -3264,59 +3266,94 @@ const AdminDashboard: React.FC = () => {
     setLoading(true);
     setError(null);
     setSuccess(null);
+    setFieldErrors({}); // Clear previous field errors
 
     try {
-      // Validate required fields with auto-scroll
+      const errors: Record<string, string> = {};
+      let firstErrorField: string | null = null;
+      let firstErrorId: string | null = null;
+
+      // Validate required fields
       if (!productForm.name || !productForm.name.trim()) {
-        setError("Product name is required");
-        setLoading(false);
-        scrollToInvalidField("name", "product-name");
-        return;
+        errors.name = "Product name is required";
+        if (!firstErrorField) {
+          firstErrorField = "name";
+          firstErrorId = "product-name";
+        }
       }
 
       if (!productForm.basePrice || !productForm.basePrice.toString().trim()) {
-        setError("Base price is required");
-        setLoading(false);
-        scrollToInvalidField("basePrice", "product-basePrice");
-        return;
+        errors.basePrice = "Base price is required";
+        if (!firstErrorField) {
+          firstErrorField = "basePrice";
+          firstErrorId = "product-basePrice";
+        }
       }
 
       // Validate category (required)
       if (!productForm.category) {
-        setError("Please select a category");
-        setLoading(false);
-        scrollToInvalidField("category", "product-category");
-        return;
+        errors.category = "Please select a category";
+        if (!firstErrorField) {
+          firstErrorField = "category";
+          firstErrorId = "product-category";
+        }
       }
 
       // Get type from selected category
       const selectedCategory = categories.find(cat => cat._id === productForm.category);
-      if (!selectedCategory) {
-        setError("Selected category not found. Please select a valid category.");
-        setLoading(false);
-        return;
+      if (!selectedCategory && productForm.category) {
+        errors.category = "Selected category not found. Please select a valid category.";
+        if (!firstErrorField) {
+          firstErrorField = "category";
+          firstErrorId = "product-category";
+        }
       }
-      const categoryType = selectedCategory.type;
+      const categoryType = selectedCategory?.type;
 
       // Category ID - always use the selected category (parent category)
-      // If subcategory is selected, category should be the parent category
       const categoryId = productForm.category;
-
-      // Printing Options and Delivery Speed are now optional (can be handled via attributes)
-      // No validation required for these fields
 
       // Validate GST Percentage (required field marked with *)
       if (!productForm.gstPercentage || !productForm.gstPercentage.toString().trim()) {
-        setError("GST % is required for invoice calculation");
-        setLoading(false);
-        scrollToInvalidField("gstPercentage", "product-gstPercentage");
-        return;
+        errors.gstPercentage = "GST % is required for invoice calculation";
+        if (!firstErrorField) {
+          firstErrorField = "gstPercentage";
+          firstErrorId = "product-gstPercentage";
+        }
       }
 
       // Validate Instructions (required field marked with *)
       if (!productForm.instructions || !productForm.instructions.trim()) {
-        setError("Instructions are required");
+        errors.instructions = "Instructions are required";
+        if (!firstErrorField) {
+          firstErrorField = "instructions";
+          firstErrorId = "product-instructions";
+        }
+      }
+
+      // If there are validation errors, show them and scroll to first error
+      if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors);
         setLoading(false);
+        
+        // Show toast with error summary
+        const errorMessages = Object.values(errors);
+        toast.error(
+          <div>
+            <div className="font-semibold">Please fix the following errors:</div>
+            <ul className="list-disc list-inside mt-1 text-sm">
+              {errorMessages.map((msg, idx) => (
+                <li key={idx}>{msg}</li>
+              ))}
+            </ul>
+          </div>,
+          { duration: 5000, position: "bottom-right" }
+        );
+        
+        // Scroll to first error field
+        if (firstErrorField && firstErrorId) {
+          scrollToInvalidField(firstErrorField, firstErrorId);
+        }
         return;
       }
 
@@ -3533,13 +3570,65 @@ const AdminDashboard: React.FC = () => {
         body: formData,
       });
 
-      // Use handleNgrokResponse which handles both success and error cases
-      // This prevents reading the response body multiple times
+      // Handle response errors
+      if (!response.ok) {
+        const responseClone = response.clone();
+        let errorMessage = "Failed to save product";
+        const backendErrors: Record<string, string> = {};
+        
+        try {
+          const errorData = await responseClone.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+          
+          // Try to map backend errors to fields
+          // Common field mappings
+          if (errorMessage.toLowerCase().includes("name")) {
+            backendErrors.name = errorMessage;
+          } else if (errorMessage.toLowerCase().includes("price") || errorMessage.toLowerCase().includes("baseprice")) {
+            backendErrors.basePrice = errorMessage;
+          } else if (errorMessage.toLowerCase().includes("category")) {
+            backendErrors.category = errorMessage;
+          } else if (errorMessage.toLowerCase().includes("gst")) {
+            backendErrors.gstPercentage = errorMessage;
+          } else if (errorMessage.toLowerCase().includes("instruction")) {
+            backendErrors.instructions = errorMessage;
+          }
+        } catch {
+          // If JSON parsing fails, use status text
+          errorMessage = response.statusText || errorMessage;
+        }
+        
+        // Set field errors if any were mapped
+        if (Object.keys(backendErrors).length > 0) {
+          setFieldErrors(backendErrors);
+          // Scroll to first error field
+          const firstErrorField = Object.keys(backendErrors)[0];
+          scrollToInvalidField(firstErrorField, `product-${firstErrorField}`);
+        }
+        
+        // Show toast error
+        toast.error(errorMessage, {
+          duration: 5000,
+          position: "bottom-right",
+        });
+        
+        setError(errorMessage);
+        setLoading(false);
+        return;
+      }
+
+      // Use handleNgrokResponse for successful response
       const data = await handleNgrokResponse(response);
 
       // Store categoryId before clearing form to use for fetching products
       const createdCategoryId = categoryId;
 
+      // Show success toast
+      toast.success(`Product ${editingProductId ? "updated" : "created"} successfully!`, {
+        duration: 3000,
+        position: "bottom-right",
+      });
+      
       setSuccess(`Product ${editingProductId ? "updated" : "created"} successfully!`);
       setSelectedType("");
       setFilteredCategoriesByType([]);
@@ -3581,6 +3670,7 @@ const AdminDashboard: React.FC = () => {
       setSelectedAttributeTypes([]);
       setSubcategoryProducts([]);
       setEditingProductId(null);
+      setFieldErrors({}); // Clear field errors on success
       
       // Refresh products list using the category route based on the category ID used to create the product
       if (createdCategoryId) {
@@ -4911,14 +5001,30 @@ const AdminDashboard: React.FC = () => {
                       type="text"
                       required
                       value={productForm.name}
-                      onChange={(e) =>
-                        setProductForm({ ...productForm, name: e.target.value })
-                      }
-                      className="w-full px-4 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500"
+                      onChange={(e) => {
+                        setProductForm({ ...productForm, name: e.target.value });
+                        // Clear error when user starts typing
+                        if (fieldErrors.name) {
+                          setFieldErrors(prev => {
+                            const newErrors = { ...prev };
+                            delete newErrors.name;
+                            return newErrors;
+                          });
+                        }
+                      }}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500 ${
+                        fieldErrors.name ? 'border-red-500 bg-red-50' : 'border-cream-300'
+                      }`}
                       placeholder="e.g., Glossy Business Cards - Premium"
                       maxLength={100}
                     />
-                    {productForm.name && productForm.name.length > 80 && (
+                    {fieldErrors.name && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {fieldErrors.name}
+                      </p>
+                    )}
+                    {productForm.name && productForm.name.length > 80 && !fieldErrors.name && (
                       <p className="text-xs text-yellow-600 mt-1">
                         {100 - productForm.name.length} characters remaining
                       </p>
@@ -5437,17 +5543,33 @@ const AdminDashboard: React.FC = () => {
                         step="0.00001"
                         min="0"
                         value={productForm.basePrice}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setProductForm({
                             ...productForm,
                             basePrice: e.target.value,
-                          })
-                        }
-                        className="w-full pl-8 pr-4 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500"
+                          });
+                          // Clear error when user starts typing
+                          if (fieldErrors.basePrice) {
+                            setFieldErrors(prev => {
+                              const newErrors = { ...prev };
+                              delete newErrors.basePrice;
+                              return newErrors;
+                            });
+                          }
+                        }}
+                        className={`w-full pl-8 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500 ${
+                          fieldErrors.basePrice ? 'border-red-500 bg-red-50' : 'border-cream-300'
+                        }`}
                         placeholder="0.00000"
                       />
                     </div>
-                    {productForm.basePrice && parseFloat(productForm.basePrice) < 0 && (
+                    {fieldErrors.basePrice && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {fieldErrors.basePrice}
+                      </p>
+                    )}
+                    {productForm.basePrice && parseFloat(productForm.basePrice) < 0 && !fieldErrors.basePrice && (
                       <p className="text-xs text-red-600 mt-1">Price cannot be negative</p>
                     )}
                   </div>
@@ -5528,6 +5650,15 @@ const AdminDashboard: React.FC = () => {
                               subcategory: "", // Reset subcategory when category changes
                             });
                             
+                            // Clear error when user selects category
+                            if (fieldErrors.category) {
+                              setFieldErrors(prev => {
+                                const newErrors = { ...prev };
+                                delete newErrors.category;
+                                return newErrors;
+                              });
+                            }
+                            
                             // Immediately fetch children for this category
                             await fetchCategoryChildren(value);
                             
@@ -5554,9 +5685,15 @@ const AdminDashboard: React.FC = () => {
                               label: cat.name,
                             })),
                         ]}
-                        className="w-full"
+                        className={`w-full ${fieldErrors.category ? 'border-red-500' : ''}`}
                       />
-                      {!productForm.category && selectedType && (
+                      {fieldErrors.category && (
+                        <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                          <AlertCircle size={12} />
+                          {fieldErrors.category}
+                        </p>
+                      )}
+                      {!productForm.category && selectedType && !fieldErrors.category && (
                         <p className="mt-1 text-xs text-amber-600 flex items-center gap-1">
                           <AlertCircle size={12} />
                           Please select a category to continue
@@ -6207,16 +6344,34 @@ const AdminDashboard: React.FC = () => {
                       min="0"
                       max="100"
                       value={productForm.gstPercentage}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setProductForm({
                           ...productForm,
                           gstPercentage: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500"
+                        });
+                        // Clear error when user starts typing
+                        if (fieldErrors.gstPercentage) {
+                          setFieldErrors(prev => {
+                            const newErrors = { ...prev };
+                            delete newErrors.gstPercentage;
+                            return newErrors;
+                          });
+                        }
+                      }}
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500 ${
+                        fieldErrors.gstPercentage ? 'border-red-500 bg-red-50' : 'border-cream-300'
+                      }`}
                       placeholder="e.g., 18"
                     />
-                    <p className="text-xs text-red-600 mt-1 font-medium">CRITICAL: Required for invoice calculation</p>
+                    {fieldErrors.gstPercentage && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {fieldErrors.gstPercentage}
+                      </p>
+                    )}
+                    {!fieldErrors.gstPercentage && (
+                      <p className="text-xs text-red-600 mt-1 font-medium">CRITICAL: Required for invoice calculation</p>
+                    )}
                   </div>
                 </div>
 
@@ -6261,20 +6416,40 @@ const AdminDashboard: React.FC = () => {
                       Instructions *
                     </label>
                     <textarea
+                      id="product-instructions"
+                      name="instructions"
                       value={productForm.instructions}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setProductForm({
                           ...productForm,
                           instructions: e.target.value,
-                        })
-                      }
+                        });
+                        // Clear error when user starts typing
+                        if (fieldErrors.instructions) {
+                          setFieldErrors(prev => {
+                            const newErrors = { ...prev };
+                            delete newErrors.instructions;
+                            return newErrors;
+                          });
+                        }
+                      }}
                       rows={6}
-                      className="w-full px-4 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500"
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500 ${
+                        fieldErrors.instructions ? 'border-red-500 bg-red-50' : 'border-cream-300'
+                      }`}
                       placeholder="Example: Maximum file size: 10 MB. Files must be in PNG or PDF format only. CDR and JPG files are not accepted. Required dimensions: 3000 × 2000 pixels. Please ensure all text is converted to outlines before uploading."
                     />
-                    <p className="text-xs text-yellow-700 mt-2 font-medium">
-                      ⚠️ These instructions will be displayed to customers with a disclaimer that the company is not responsible if instructions are not followed.
-                    </p>
+                    {fieldErrors.instructions && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {fieldErrors.instructions}
+                      </p>
+                    )}
+                    {!fieldErrors.instructions && (
+                      <p className="text-xs text-yellow-700 mt-2 font-medium">
+                        ⚠️ These instructions will be displayed to customers with a disclaimer that the company is not responsible if instructions are not followed.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -10881,11 +11056,13 @@ const AdminDashboard: React.FC = () => {
                                 // Calculate price impact for this attribute
                                 const basePrice = selectedOrder.product.basePrice || 0;
                                 let attributeCost = 0;
+                                let pricePerUnit = 0;
                                 if (attr.priceAdd > 0) {
+                                  pricePerUnit = attr.priceAdd;
                                   attributeCost = attr.priceAdd * selectedOrder.quantity;
                                 } else if (attr.priceMultiplier && attr.priceMultiplier !== 1) {
-                                  const baseTotal = basePrice * selectedOrder.quantity;
-                                  attributeCost = baseTotal * (attr.priceMultiplier - 1);
+                                  pricePerUnit = basePrice * (attr.priceMultiplier - 1);
+                                  attributeCost = pricePerUnit * selectedOrder.quantity;
                                 }
                                 
                                 if (attributeCost === 0) return null;
@@ -10895,7 +11072,7 @@ const AdminDashboard: React.FC = () => {
                                     <span>
                                       {attr.attributeName} ({attr.label})
                                     </span>
-                                    <span>+{formatCurrency(attributeCost)}</span>
+                                    <span>+{formatCurrency(pricePerUnit)}/unit × {selectedOrder.quantity.toLocaleString()} = {formatCurrency(attributeCost)}</span>
                                   </div>
                                 );
                               })}
