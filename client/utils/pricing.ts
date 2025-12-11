@@ -148,15 +148,16 @@ export const calculateOrderBreakdown = (order: OrderForCalculation): OrderBreakd
   if (order.selectedDynamicAttributes && order.selectedDynamicAttributes.length > 0) {
     order.selectedDynamicAttributes.forEach((attr) => {
       if (attr.priceMultiplier && attr.priceMultiplier !== 1) {
-        // Calculate the price impact from multiplier
+        // Calculate the price impact from multiplier as per-unit price
         const multiplierImpact = attr.priceMultiplier - 1;
-        const cost = (originalBasePrice * multiplierImpact * quantity);
+        const pricePerUnit = originalBasePrice * multiplierImpact;
+        const cost = pricePerUnit * quantity;
         
         optionBreakdowns.push({
-          name: `${attr.attributeName}: ${attr.label} (×${attr.priceMultiplier.toFixed(2)})`,
-          priceAdd: 0, // Multiplier-based, not a fixed add
+          name: `${attr.attributeName}: ${attr.label}`,
+          priceAdd: pricePerUnit, // Show as per-unit price instead of multiplier
           cost,
-          isPerUnit: false,
+          isPerUnit: true, // Mark as per-unit for consistent display
         });
       } else if (attr.priceAdd && attr.priceAdd > 0) {
         // Handle priceAdd for dynamic attributes

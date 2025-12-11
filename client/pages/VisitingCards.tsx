@@ -353,7 +353,22 @@ const VisitingCards: React.FC = () => {
             // Determine if category has subcategories
             const hasSubcategories = subcategoriesArray && subcategoriesArray.length > 0;
             
-            // Set subcategories if they exist
+            // AUTO-SKIP: If only one subcategory, navigate directly to its products
+            if (hasSubcategories && subcategoriesArray.length === 1) {
+              const singleSubcategory = subcategoriesArray[0];
+              const subcategoryIdForLink = singleSubcategory.slug || singleSubcategory._id;
+              
+              // Navigate directly to subcategory products page
+              if (categoryId) {
+                navigate(`/digital-print/${categoryId}/${subcategoryIdForLink}`, { replace: true });
+              } else {
+                navigate(`/digital-print/${subcategoryIdForLink}`, { replace: true });
+              }
+              setLoading(false);
+              return;
+            }
+            
+            // Set subcategories if they exist (multiple subcategories)
             if (hasSubcategories) {
               // Sort by sortOrder to maintain the order set in admin dashboard
               subcategoriesArray.sort((a: SubCategory, b: SubCategory) => (a.sortOrder || 0) - (b.sortOrder || 0));
@@ -362,10 +377,10 @@ const VisitingCards: React.FC = () => {
               setSubCategories([]);
             }
             
-            // Set direct products if they exist (even when subcategories exist)
-            if (directProducts && directProducts.length > 0) {
+            // Set direct products if they exist (only when no subcategories)
+            if (directProducts && directProducts.length > 0 && !hasSubcategories) {
               // Auto-skip: If only one product and no subcategories, directly navigate to its detail page
-              if (directProducts.length === 1 && !hasSubcategories) {
+              if (directProducts.length === 1) {
                 const singleProduct = directProducts[0];
                 
                 // Navigate directly to the product detail page
@@ -378,7 +393,7 @@ const VisitingCards: React.FC = () => {
                 return;
               }
               
-              // Multiple products or has subcategories - show them normally
+              // Multiple products - show them normally
               setProducts(directProducts);
               
               // Get category info
@@ -880,7 +895,7 @@ const VisitingCards: React.FC = () => {
           <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
             <p className="text-red-800">{error}</p>
           </div>
-        ) : subCategories.length > 0 && !subCategoryId ? (
+        ) : (subCategories.length > 0 && !subCategoryId) || (products.length > 0 && subCategories.length === 0 && !subCategoryId) ? (
           <>
             {/* Subcategory Filters */}
             <div className="mb-6 bg-white rounded-xl shadow-md border border-cream-200 p-4 sm:p-6">

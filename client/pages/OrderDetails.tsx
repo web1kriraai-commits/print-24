@@ -422,16 +422,15 @@ const ProductSpecsPanel: React.FC<{ order: Order }> = ({ order }) => {
                   </div>
                   {(attr.priceAdd > 0 || attr.priceMultiplier) && (
                     <div className="text-right">
-                      {attr.priceAdd > 0 && (
+                      {attr.priceAdd > 0 ? (
                         <span className="block text-sm font-bold text-slate-900">
-                          +{formatCurrency(attr.priceAdd)}
+                          +{formatCurrency(attr.priceAdd)}/unit
                         </span>
-                      )}
-                      {attr.priceMultiplier && attr.priceMultiplier !== 1 && (
-                        <span className="block text-xs text-slate-500">
-                          ×{attr.priceMultiplier.toFixed(2)}
+                      ) : attr.priceMultiplier && attr.priceMultiplier !== 1 ? (
+                        <span className="block text-sm font-bold text-slate-900">
+                          +{formatCurrency((order.product?.basePrice || 0) * (attr.priceMultiplier - 1))}/unit
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   )}
                 </div>
