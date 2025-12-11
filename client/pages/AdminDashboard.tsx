@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useClientOnly } from "../hooks/useClientOnly";
 import { useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton";
+import toast from "react-hot-toast";
 import {
   Package,
   FolderPlus,
@@ -2785,18 +2786,96 @@ const AdminDashboard: React.FC = () => {
         headers: getAuthHeaders(),
       });
 
-      const data = await handleNgrokResponse(response);
-      
+      // Check response status before parsing
       if (!response.ok) {
-        // Backend validation will return a detailed error message if attribute is in use
-        throw new Error(data.error || "Failed to delete attribute type");
+        // Clone the response to read it without consuming the body
+        const responseClone = response.clone();
+        let errorMessage = "Failed to delete attribute type";
+        
+        try {
+          const errorData = await responseClone.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+          console.log("Error data received:", errorData);
+        } catch (parseError) {
+          // If JSON parsing fails, try to get text
+          try {
+            const text = await response.text();
+            errorMessage = text || response.statusText || errorMessage;
+          } catch {
+            errorMessage = response.statusText || errorMessage;
+          }
+        }
+        
+        console.log("Error message:", errorMessage);
+        
+        // Check if the error is about attribute being in use
+        const isInUseError = errorMessage.toLowerCase().includes("used") || 
+                            errorMessage.toLowerCase().includes("in use") ||
+                            errorMessage.toLowerCase().includes("product") ||
+                            errorMessage.toLowerCase().includes("cannot delete");
+        
+        // Show toast notification
+        if (isInUseError) {
+          toast.error(
+            <div>
+              <div className="font-semibold">Attribute is in use</div>
+              {/* <div className="text-sm mt-1">{errorMessage}</div> */}
+            </div>,
+            {
+              duration: 5000,
+              position: "bottom-right",
+            }
+          );
+        } else {
+          toast.error(errorMessage, {
+            duration: 4000,
+            position: "bottom-right",
+          });
+        }
+        
+        setError(errorMessage);
+        setLoading(false);
+        return; // Exit early, don't throw
       }
 
-      setSuccess("Attribute type deleted successfully");
+      // Parse successful response
+      const data = await handleNgrokResponse(response);
+
+      // Show success toast
+      toast.success("Attribute deleted successfully", {
+        duration: 3000,
+        position: "bottom-right",
+      });
+      
       fetchAttributeTypes();
     } catch (err) {
       console.error("Error deleting attribute type:", err);
-      setError(err instanceof Error ? err.message : "Failed to delete attribute type");
+      const errorMessage = err instanceof Error ? err.message : "Failed to delete attribute type";
+      
+      // Check if error is about attribute being in use (in case it wasn't caught above)
+      const isInUseError = errorMessage.toLowerCase().includes("used") || 
+                          errorMessage.toLowerCase().includes("in use") ||
+                          errorMessage.toLowerCase().includes("product");
+      
+      if (isInUseError) {
+        toast.error(
+          <div>
+            <div className="font-semibold">Attribute is in use</div>
+            {/* <div className="text-sm mt-1">{errorMessage}</div> */}
+          </div>,
+          {
+            duration: 5000,
+            position: "bottom-right",
+          }
+        );
+      } else {
+        toast.error(errorMessage, {
+          duration: 4000,
+          position: "bottom-right",
+        });
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -9691,7 +9770,6 @@ const AdminDashboard: React.FC = () => {
                             <th className="px-4 py-3 text-left text-sm font-medium text-cream-900">Effect Type</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-cream-900">Pricing</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-cream-900">Common</th>
-                            <th className="px-4 py-3 text-center text-sm font-medium text-cream-900">In Use</th>
                             <th className="px-4 py-3 text-center text-sm font-medium text-cream-900">Actions</th>
                           </tr>
                         </thead>
@@ -9710,13 +9788,6 @@ const AdminDashboard: React.FC = () => {
                               <td className="px-4 py-3 text-sm text-cream-600">{at.primaryEffectType}</td>
                               <td className="px-4 py-3 text-sm text-cream-600">{at.isPricingAttribute ? "Yes" : "No"}</td>
                               <td className="px-4 py-3 text-sm text-cream-600">{at.isCommonAttribute ? "Yes" : "No"}</td>
-                              <td className="px-4 py-3 text-center">
-                                {at.isUsed ? (
-                                  <CheckCircle2 size={20} className="text-green-600 mx-auto" title="This attribute is currently used in products" />
-                                ) : (
-                                  <XCircle size={20} className="text-gray-400 mx-auto" title="This attribute is not used in any products" />
-                                )}
-                              </td>
                               <td className="px-4 py-3 text-center">
                                 <div className="flex items-center justify-center gap-2">
                                   <button
