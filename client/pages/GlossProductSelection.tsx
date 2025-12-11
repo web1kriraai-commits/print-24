@@ -456,6 +456,21 @@ const GlossProductSelection: React.FC = () => {
 
               setProducts(mappedProducts);
               
+              // AUTO-SKIP: If only one product, navigate directly to its detail page
+              if (mappedProducts.length === 1 && !productId) {
+                const singleProduct = mappedProducts[0];
+                if (categoryId && subCategoryId) {
+                  navigate(`/digital-print/${categoryId}/${subCategoryId}/${singleProduct._id}`, { replace: true });
+                } else if (categoryId) {
+                  navigate(`/digital-print/${categoryId}/${singleProduct._id}`, { replace: true });
+                } else if (subCategoryId) {
+                  navigate(`/digital-print/${subCategoryId}/${singleProduct._id}`, { replace: true });
+                } else {
+                  navigate(`/digital-print/${singleProduct._id}`, { replace: true });
+                }
+                return;
+              }
+              
               // If productId is provided, auto-select that product
               if (productId && mappedProducts.length > 0) {
                 const productToSelect = mappedProducts.find(p => p._id === productId || p.id === productId);
@@ -490,7 +505,25 @@ const GlossProductSelection: React.FC = () => {
     setSelectedPrintingOption("");
     setSelectedDeliverySpeed("");
     setSelectedTextureType("");
-    setQuantity(product.filters?.orderQuantity?.min || 1000);
+    
+    // Auto-select smallest quantity value
+    const orderQuantity = product.filters?.orderQuantity;
+    let smallestQuantity = 1000; // Default fallback
+    
+    if (orderQuantity) {
+      if (orderQuantity.quantityType === "STEP_WISE" && orderQuantity.stepWiseQuantities && orderQuantity.stepWiseQuantities.length > 0) {
+        // Use smallest value from step-wise quantities
+        smallestQuantity = Math.min(...orderQuantity.stepWiseQuantities);
+      } else if (orderQuantity.quantityType === "RANGE_WISE" && orderQuantity.rangeWiseQuantities && orderQuantity.rangeWiseQuantities.length > 0) {
+        // Use smallest min value from ranges
+        smallestQuantity = Math.min(...orderQuantity.rangeWiseQuantities.map((r: any) => r.min || 1000));
+      } else {
+        // Use min from simple quantity config
+        smallestQuantity = orderQuantity.min || 1000;
+      }
+    }
+    
+    setQuantity(smallestQuantity);
     setAppliedDiscount(null);
     
     // Initialize dynamic attributes with default values
@@ -2287,13 +2320,24 @@ const GlossProductSelection: React.FC = () => {
         <div className="mb-4 sm:mb-6">
           <BackButton
             onClick={() => {
-              // Go back one step in browser history
-              navigate(-1);
-              // Scroll to top after navigation
+              // Navigate back based on current route structure
+              if (productId && subCategoryId && categoryId) {
+                // From product detail → go back to subcategory products
+                navigate(`/digital-print/${categoryId}/${subCategoryId}`);
+              } else if (productId && categoryId) {
+                // From product detail (direct under category) → go back to category
+                navigate(`/digital-print/${categoryId}`);
+              } else if (subCategoryId && categoryId) {
+                // From subcategory products → go back to category
+                navigate(`/digital-print/${categoryId}`);
+              } else {
+                // Fallback to digital print page
+                navigate("/digital-print");
+              }
               window.scrollTo(0, 0);
             }}
             fallbackPath={categoryId ? `/digital-print/${categoryId}` : "/digital-print"}
-            label="Back to Visiting Cards"
+            label={subCategoryId ? "Back to Subcategory" : categoryId ? "Back to Category" : "Back to Categories"}
             className="text-sm sm:text-base text-cream-600 hover:text-cream-900"
           />
         </div>
@@ -2541,13 +2585,21 @@ const GlossProductSelection: React.FC = () => {
                       <div className="flex items-start justify-between mb-2">
                         <BackButton
                           onClick={() => {
-                            // Go back one step in browser history
-                            navigate(-1);
-                            // Scroll to top after navigation
+                            // Navigate back based on current route structure
+                            if (subCategoryId && categoryId) {
+                              // From product detail → go back to subcategory products
+                              navigate(`/digital-print/${categoryId}/${subCategoryId}`);
+                            } else if (categoryId) {
+                              // From product detail (direct under category) → go back to category
+                              navigate(`/digital-print/${categoryId}`);
+                            } else {
+                              // Fallback to digital print page
+                              navigate("/digital-print");
+                            }
                             window.scrollTo(0, 0);
                           }}
-                          fallbackPath={categoryId ? `/digital-print/${categoryId}` : "/digital-print"}
-                          label="Back to Products"
+                          fallbackPath={subCategoryId && categoryId ? `/digital-print/${categoryId}/${subCategoryId}` : categoryId ? `/digital-print/${categoryId}` : "/digital-print"}
+                          label={subCategoryId ? "Back to Subcategory" : categoryId ? "Back to Category" : "Back to Products"}
                           className="text-sm text-cream-600 hover:text-cream-900 mb-2"
                         />
                       </div>
@@ -3424,37 +3476,7 @@ const GlossProductSelection: React.FC = () => {
                       );
                     })()}
 
-                    {/* Estimated Delivery Information */}
-                    {estimatedDeliveryDate && (
-                      <div className="mb-6 sm:mb-8 bg-cream-50 p-4 sm:p-6 rounded-xl border border-cream-200">
-                        <h3 className="font-bold text-sm sm:text-base text-cream-900 mb-3 sm:mb-4 flex items-center gap-2">
-                          <Truck size={16} className="sm:w-[18px] sm:h-[18px]" /> Estimated Delivery
-                        </h3>
-                        
-                        <AnimatePresence>
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            className="space-y-2"
-                          >
-                            <div className="text-green-700 text-sm flex items-center gap-2 bg-green-50 p-3 rounded-lg border border-green-100">
-                              <Check size={14} />
-                              <div>
-                                <div className="font-semibold">Estimated Delivery by <strong>{estimatedDeliveryDate}</strong></div>
-                                {deliveryLocationSource && (
-                                  <div className="text-xs text-green-600 mt-1">
-                                    {deliveryLocationSource}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <p className="text-xs text-cream-600">
-                              Delivery information will be collected at checkout. This is an estimate based on your location.
-                            </p>
-                          </motion.div>
-                        </AnimatePresence>
-                      </div>
-                    )}
+                    {/* Delivery information removed - will be shown at checkout only */}
 
                     {/* Upload Design Section */}
                     <div className="mb-6 sm:mb-8 bg-cream-50 p-4 sm:p-6 rounded-xl border border-cream-200" data-upload-section>
@@ -3904,6 +3926,23 @@ const GlossProductSelection: React.FC = () => {
                     )}
                   </div>
                 </div>
+
+                {/* Estimated Delivery Information - Show at checkout */}
+                {estimatedDeliveryDate && (
+                  <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                    <h3 className="font-bold text-sm text-cream-900 mb-2 flex items-center gap-2">
+                      <Truck size={16} /> Estimated Delivery
+                    </h3>
+                    <div className="text-green-700 text-sm">
+                      <div className="font-semibold mb-1">Estimated Delivery by <strong>{estimatedDeliveryDate}</strong></div>
+                      {deliveryLocationSource && (
+                        <div className="text-xs text-green-600 mt-1">
+                          {deliveryLocationSource}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3">

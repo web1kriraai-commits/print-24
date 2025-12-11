@@ -134,7 +134,6 @@ const DigitalPrint: React.FC = () => {
 
         const headers = {
           Accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
         };
 
         // Fetch Digital Categories
@@ -638,12 +637,12 @@ const DigitalPrint: React.FC = () => {
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: index * 0.03 }}
-                  className="flex-shrink-0 snap-start transition-all duration-500 ease-in-out w-1/2 sm:w-1/3 md:w-1/4 lg:w-1/5 xl:w-1/6 2xl:w-[14.285%] px-0.5 sm:px-1 md:px-1"
+                  className="flex-shrink-0 snap-start transition-all duration-500 ease-in-out w-1/2 sm:w-1/3 md:w-1/4 lg:w-1/5 xl:w-1/6 px-1 sm:px-1.5 md:px-2"
                 >
                   <Link to={`/digital-print/${category._id}`} className="block">
-                    <div className="group flex flex-col items-center gap-1 sm:gap-1.5 md:gap-2 p-1.5 sm:p-2 md:p-2.5 rounded-lg sm:rounded-xl transition-all duration-300 bg-cream-50">
-                      {/* Increased circle sizes - same as bulk print */}
-                      <div className="w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 lg:w-40 lg:h-40 xl:w-44 xl:h-44 2xl:w-48 2xl:h-48 rounded-full overflow-hidden bg-white group-hover:bg-[#f5faf0] transition-all duration-300 shadow-md sm:shadow-lg group-hover:shadow-xl group-hover:scale-105 flex items-center justify-center">
+                    <div className="group flex flex-col items-center gap-1.5 sm:gap-2 p-2 sm:p-2.5 rounded-lg transition-all duration-300 bg-cream-50">
+                      {/* Reduced circle sizes for better mobile compatibility */}
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 xl:w-36 xl:h-36 rounded-full overflow-hidden bg-white group-hover:bg-[#f5faf0] transition-all duration-300 shadow-sm sm:shadow-md group-hover:shadow-lg group-hover:scale-105 flex items-center justify-center">
                         <img
                           src={category.image}
                           alt={category.name}
@@ -651,12 +650,12 @@ const DigitalPrint: React.FC = () => {
                             category.name.toLowerCase().includes('visiting card') 
                               ? 'w-full h-full object-cover' 
                               : category.name.toLowerCase().includes('card holder')
-                              ? 'w-14 h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 lg:w-20 lg:h-20 xl:w-22 xl:h-22 2xl:w-24 2xl:h-24 object-contain'
-                              : 'w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 xl:w-36 xl:h-36 2xl:w-40 2xl:h-40 object-contain'
+                              ? 'w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 xl:w-18 xl:h-18 object-contain'
+                              : 'w-14 h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 lg:w-20 lg:h-20 xl:w-22 xl:h-22 object-contain'
                           }`}
                         />
                       </div>
-                      <span className="text-xs sm:text-sm md:text-base font-semibold text-cream-900 text-center max-w-[90px] sm:max-w-[110px] md:max-w-[130px] lg:max-w-[150px] line-clamp-2 leading-tight mt-1">
+                      <span className="text-xs sm:text-sm font-semibold text-cream-900 text-center max-w-[80px] sm:max-w-[100px] md:max-w-[120px] line-clamp-2 leading-tight mt-0.5">
                         {category.name}
                       </span>
                     </div>
@@ -771,12 +770,12 @@ const DigitalPrint: React.FC = () => {
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: index * 0.03 }}
-                  className="flex-shrink-0 snap-start transition-all duration-500 ease-in-out w-1/2 sm:w-1/3 md:w-1/4 lg:w-1/5 xl:w-1/6 2xl:w-[14.285%] px-0.5 sm:px-1 md:px-1"
+                  className="flex-shrink-0 snap-start transition-all duration-500 ease-in-out w-1/2 sm:w-1/3 md:w-1/4 lg:w-1/5 xl:w-1/6 px-1 sm:px-1.5 md:px-2"
                 >
                   <Link to={`/digital-print/${category._id}`} className="block">
-                    <div className="group flex flex-col items-center gap-1 sm:gap-1.5 md:gap-2 p-1.5 sm:p-2 md:p-2.5 rounded-lg sm:rounded-xl transition-all duration-300 bg-cream-50">
-                      {/* Increased circle sizes - larger than digital print */}
-                      <div className="w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 lg:w-40 lg:h-40 xl:w-44 xl:h-44 2xl:w-48 2xl:h-48 rounded-full overflow-hidden bg-white group-hover:bg-[#f5fbff] transition-all duration-300 shadow-md sm:shadow-lg group-hover:shadow-xl group-hover:scale-105 flex items-center justify-center">
+                    <div className="group flex flex-col items-center gap-1.5 sm:gap-2 p-2 sm:p-2.5 rounded-lg transition-all duration-300 bg-cream-50">
+                      {/* Reduced circle sizes for better mobile compatibility */}
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 xl:w-36 xl:h-36 rounded-full overflow-hidden bg-white group-hover:bg-[#f5fbff] transition-all duration-300 shadow-sm sm:shadow-md group-hover:shadow-lg group-hover:scale-105 flex items-center justify-center">
                         <img
                           src={category.image}
                           alt={category.name}
@@ -784,12 +783,12 @@ const DigitalPrint: React.FC = () => {
                             category.name.toLowerCase().includes('visiting card') 
                               ? 'w-full h-full object-cover' 
                               : category.name.toLowerCase().includes('card holder')
-                              ? 'w-14 h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 lg:w-20 lg:h-20 xl:w-22 xl:h-22 2xl:w-24 2xl:h-24 object-contain'
-                              : 'w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 xl:w-36 xl:h-36 2xl:w-40 2xl:h-40 object-contain'
+                              ? 'w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 xl:w-18 xl:h-18 object-contain'
+                              : 'w-14 h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 lg:w-20 lg:h-20 xl:w-22 xl:h-22 object-contain'
                           }`}
                         />
                       </div>
-                      <span className="text-xs sm:text-sm md:text-base font-semibold text-cream-900 text-center max-w-[90px] sm:max-w-[110px] md:max-w-[130px] lg:max-w-[150px] line-clamp-2 leading-tight mt-1">
+                      <span className="text-xs sm:text-sm font-semibold text-cream-900 text-center max-w-[80px] sm:max-w-[100px] md:max-w-[120px] line-clamp-2 leading-tight mt-0.5">
                         {category.name}
                       </span>
                     </div>

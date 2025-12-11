@@ -187,7 +187,6 @@ const Home: React.FC = () => {
         const BASE_URL = API_BASE_URL_WITH_API;
         const headers = {
           Accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
         };
 
         // Fetch Digital Categories
@@ -269,7 +268,6 @@ const Home: React.FC = () => {
         const BASE_URL = API_BASE_URL_WITH_API;
         const headers = {
           Accept: "application/json",
-          "ngrok-skip-browser-warning": "true",
         };
 
         const response = await fetch(`${BASE_URL}/reviews`, {
@@ -649,8 +647,8 @@ const Home: React.FC = () => {
                               {category.type === "digital" ? "Digital Print" : "Bulk Print"}
                             </div>
                           )}
-                          {/* Increased circle sizes for better visibility */}
-                          <div className={`w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 lg:w-40 lg:h-40 xl:w-44 xl:h-44 2xl:w-48 2xl:h-48 rounded-full overflow-hidden bg-white transition-all duration-300 shadow-md sm:shadow-lg group-hover:shadow-xl group-hover:scale-105 flex items-center justify-center relative ${
+                          {/* Reduced circle sizes for better mobile compatibility */}
+                          <div className={`w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 xl:w-36 xl:h-36 rounded-full overflow-hidden bg-white transition-all duration-300 shadow-sm sm:shadow-md group-hover:shadow-lg group-hover:scale-105 flex items-center justify-center relative ${
                             category.type === "digital" 
                               ? "group-hover:bg-[#f5faf0]" 
                               : "group-hover:bg-[#f5fbff]"
@@ -662,12 +660,12 @@ const Home: React.FC = () => {
                                 category.name.toLowerCase().includes('visiting card') 
                                   ? 'w-full h-full object-cover' 
                                   : category.name.toLowerCase().includes('card holder')
-                                  ? 'w-14 h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 lg:w-20 lg:h-20 xl:w-22 xl:h-22 2xl:w-24 2xl:h-24 object-contain'
-                                  : 'w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 xl:w-36 xl:h-36 2xl:w-40 2xl:h-40 object-contain'
+                                  ? 'w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 xl:w-18 xl:h-18 object-contain'
+                                  : 'w-14 h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 lg:w-20 lg:h-20 xl:w-22 xl:h-22 object-contain'
                               }`}
                             />
                           </div>
-                          <span className="text-xs sm:text-sm md:text-base font-semibold text-cream-900 text-center max-w-[90px] sm:max-w-[110px] md:max-w-[130px] lg:max-w-[150px] line-clamp-2 leading-tight mt-1">
+                          <span className="text-xs sm:text-sm font-semibold text-cream-900 text-center max-w-[80px] sm:max-w-[100px] md:max-w-[120px] line-clamp-2 leading-tight mt-0.5">
                             {category.name}
                           </span>
                         </div>

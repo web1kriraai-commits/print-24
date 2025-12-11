@@ -3,6 +3,10 @@ import { hydrateRoot, createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import ErrorBoundary from './components/ErrorBoundary';
 import { routes } from './routes';
+// PrimeReact CSS (for SSR compatibility)
+import 'primereact/resources/themes/lara-light-amber/theme.css';
+import 'primereact/resources/primereact.min.css';
+import 'quill/dist/quill.snow.css';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

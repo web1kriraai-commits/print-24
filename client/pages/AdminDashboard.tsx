@@ -40,7 +40,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ReviewFilterDropdown } from "../components/ReviewFilterDropdown";
-import CKEditor from "../components/CKEditor";
+import RichTextEditor from "../components/RichTextEditor";
 import { formatCurrency, calculateOrderBreakdown, OrderForCalculation } from "../utils/pricing";
 import { API_BASE_URL_WITH_API as API_BASE_URL } from "../lib/apiConfig";
 import { scrollToInvalidField } from "../lib/validationUtils";
@@ -354,6 +354,8 @@ const AdminDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  // Field-level errors for product form
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryImage, setEditingCategoryImage] = useState<string | null>(null);
 
@@ -968,7 +970,6 @@ const AdminDashboard: React.FC = () => {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
-      "ngrok-skip-browser-warning": "true",
     };
     
     if (includeContentType) {
@@ -1020,13 +1021,9 @@ const AdminDashboard: React.FC = () => {
   const handleNgrokResponse = async (response: Response) => {
     const text = await response.text();
     
-    // Check if response is HTML (could be error page or ngrok warning)
+    // Check if response is HTML (could be error page)
     if (text.trim().startsWith("<!DOCTYPE") || text.trim().startsWith("<html")) {
-      // Check if it's specifically an ngrok warning
-      if (text.includes("ngrok") || text.includes("Ngrok")) {
-        throw new Error("Ngrok blocked request. Please try again or check your Ngrok configuration. Make sure the ngrok-skip-browser-warning header is included.");
-      }
-      // Otherwise it's likely a server error page
+      // It's likely a server error page
       throw new Error(`Server returned HTML instead of JSON. Status: ${response.status} ${response.statusText}`);
     }
     
@@ -3534,67 +3531,96 @@ const AdminDashboard: React.FC = () => {
     setLoading(true);
     setError(null);
     setSuccess(null);
+    // Clear previous errors
     setProductFormErrors({});
 
     try {
       // Validate required fields with auto-scroll and field-level errors
-      let hasErrors = false;
+      let firstErrorField: string | null = null;
+      let firstErrorId: string | null = null;
       const errors: typeof productFormErrors = {};
 
       if (!productForm.name || !productForm.name.trim()) {
         errors.name = "Product name is required";
-        hasErrors = true;
+        if (!firstErrorField) {
+          firstErrorField = "name";
+          firstErrorId = "product-name";
+        }
       }
 
       if (!productForm.basePrice || !productForm.basePrice.toString().trim()) {
         errors.basePrice = "Base price is required";
-        hasErrors = true;
+        if (!firstErrorField) {
+          firstErrorField = "basePrice";
+          firstErrorId = "product-basePrice";
+        }
       }
 
       // Validate category (required)
       if (!productForm.category) {
         errors.category = "Please select a category";
-        hasErrors = true;
+        if (!firstErrorField) {
+          firstErrorField = "category";
+          firstErrorId = "product-category";
+        }
       }
 
       // Get type from selected category
       const selectedCategory = categories.find(cat => cat._id === productForm.category);
       if (!selectedCategory && productForm.category) {
         errors.category = "Selected category not found. Please select a valid category.";
-        hasErrors = true;
+        if (!firstErrorField) {
+          firstErrorField = "category";
+          firstErrorId = "product-category";
+        }
       }
       const categoryType = selectedCategory?.type;
 
       // Category ID - always use the selected category (parent category)
-      // If subcategory is selected, category should be the parent category
       const categoryId = productForm.category;
-
-      // Printing Options and Delivery Speed are now optional (can be handled via attributes)
-      // No validation required for these fields
 
       // Validate GST Percentage (required field marked with *)
       if (!productForm.gstPercentage || !productForm.gstPercentage.toString().trim()) {
         errors.gstPercentage = "GST % is required for invoice calculation";
-        hasErrors = true;
+        if (!firstErrorField) {
+          firstErrorField = "gstPercentage";
+          firstErrorId = "product-gstPercentage";
+        }
       }
 
       // Validate Instructions (required field marked with *)
       if (!productForm.instructions || !productForm.instructions.trim()) {
         errors.instructions = "Instructions are required";
-        hasErrors = true;
+        if (!firstErrorField) {
+          firstErrorField = "instructions";
+          firstErrorId = "product-instructions";
+        }
       }
 
-      if (hasErrors) {
+      // If there are validation errors, show them and scroll to first error
+      if (Object.keys(errors).length > 0) {
         setProductFormErrors(errors);
         setError("Please fix the errors below");
         setLoading(false);
+        
+        // Show toast with error summary
+        const errorMessages = Object.values(errors).filter((msg): msg is string => !!msg);
+        toast.error(
+          <div>
+            <div className="font-semibold">Please fix the following errors:</div>
+            <ul className="list-disc list-inside mt-1 text-sm">
+              {errorMessages.map((msg, idx) => (
+                <li key={idx}>{msg}</li>
+              ))}
+            </ul>
+          </div>,
+          { duration: 5000, position: "bottom-right" }
+        );
+        
         // Scroll to first error field
-        const firstErrorField = Object.keys(errors)[0];
-        if (firstErrorField === 'name') scrollToInvalidField("name", "product-name");
-        else if (firstErrorField === 'basePrice') scrollToInvalidField("basePrice", "product-basePrice");
-        else if (firstErrorField === 'category') scrollToInvalidField("category", "product-category");
-        else if (firstErrorField === 'gstPercentage') scrollToInvalidField("gstPercentage", "product-gstPercentage");
-        else if (firstErrorField === 'instructions') scrollToInvalidField("instructions", "product-instructions");
+        if (firstErrorField && firstErrorId) {
+          scrollToInvalidField(firstErrorField, firstErrorId);
+        }
         return;
       }
 
@@ -3814,13 +3840,65 @@ const AdminDashboard: React.FC = () => {
         body: formData,
       });
 
-      // Use handleNgrokResponse which handles both success and error cases
-      // This prevents reading the response body multiple times
+      // Handle response errors
+      if (!response.ok) {
+        const responseClone = response.clone();
+        let errorMessage = "Failed to save product";
+        const backendErrors: Record<string, string> = {};
+        
+        try {
+          const errorData = await responseClone.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+          
+          // Try to map backend errors to fields
+          // Common field mappings
+          if (errorMessage.toLowerCase().includes("name")) {
+            backendErrors.name = errorMessage;
+          } else if (errorMessage.toLowerCase().includes("price") || errorMessage.toLowerCase().includes("baseprice")) {
+            backendErrors.basePrice = errorMessage;
+          } else if (errorMessage.toLowerCase().includes("category")) {
+            backendErrors.category = errorMessage;
+          } else if (errorMessage.toLowerCase().includes("gst")) {
+            backendErrors.gstPercentage = errorMessage;
+          } else if (errorMessage.toLowerCase().includes("instruction")) {
+            backendErrors.instructions = errorMessage;
+          }
+        } catch {
+          // If JSON parsing fails, use status text
+          errorMessage = response.statusText || errorMessage;
+        }
+        
+        // Set field errors if any were mapped
+        if (Object.keys(backendErrors).length > 0) {
+          setFieldErrors(backendErrors);
+          // Scroll to first error field
+          const firstErrorField = Object.keys(backendErrors)[0];
+          scrollToInvalidField(firstErrorField, `product-${firstErrorField}`);
+        }
+        
+        // Show toast error
+        toast.error(errorMessage, {
+          duration: 5000,
+          position: "bottom-right",
+        });
+        
+        setError(errorMessage);
+        setLoading(false);
+        return;
+      }
+
+      // Use handleNgrokResponse for successful response
       const data = await handleNgrokResponse(response);
 
       // Store categoryId before clearing form to use for fetching products
       const createdCategoryId = categoryId;
 
+      // Show success toast
+      toast.success(`Product ${editingProductId ? "updated" : "created"} successfully!`, {
+        duration: 3000,
+        position: "bottom-right",
+      });
+      
       setSuccess(`Product ${editingProductId ? "updated" : "created"} successfully!`);
       setSelectedType("");
       setFilteredCategoriesByType([]);
@@ -3862,6 +3940,7 @@ const AdminDashboard: React.FC = () => {
       setSelectedAttributeTypes([]);
       setSubcategoryProducts([]);
       setEditingProductId(null);
+      setFieldErrors({}); // Clear field errors on success
       
       // Refresh products list using the category route based on the category ID used to create the product
       if (createdCategoryId) {
@@ -5264,6 +5343,7 @@ const AdminDashboard: React.FC = () => {
                       value={productForm.name}
                       onChange={(e) => {
                         setProductForm({ ...productForm, name: e.target.value });
+                        // Clear error when user starts typing
                         if (productFormErrors.name) {
                           setProductFormErrors({ ...productFormErrors, name: undefined });
                         }
@@ -5293,11 +5373,11 @@ const AdminDashboard: React.FC = () => {
                       <div className="group relative">
                         <Info size={14} className="text-cream-500 cursor-help" />
                         <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block z-10 w-64 p-2 bg-cream-900 text-white text-xs rounded-lg shadow-lg">
-                          Detailed product description that customers will see. Use formatting to make it readable and professional. You can insert images and links using the toolbar buttons.
+                          Detailed product description that customers will see. Use formatting to make it readable and professional. You can insert images using the toolbar buttons.
                         </div>
                       </div>
                     </label>
-                    <CKEditor
+                    <RichTextEditor
                       value={productForm.description}
                       onChange={(html) =>
                         setProductForm({
@@ -5305,14 +5385,16 @@ const AdminDashboard: React.FC = () => {
                           description: html,
                         })
                       }
-                      placeholder="Enter product description. Use the toolbar to format text, insert images, links, and more."
+                      placeholder="Enter product description. Use the toolbar to format text, insert images, and more."
                     />
                     <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-xs font-medium text-blue-900 mb-1">💡 CKEditor Features:</p>
+                      <p className="text-xs font-medium text-blue-900 mb-1">💡 Rich Text Editor Features:</p>
                       <ul className="text-xs text-blue-800 space-y-1 list-disc list-inside">
-                        <li>Format text with <strong>bold</strong>, <em>italic</em>, underline, and more</li>
-                        <li>Insert images and links using the toolbar buttons</li>
-                        <li>Create lists, tables, and embed media (YouTube, etc.)</li>
+                        <li>Format text with <strong>bold</strong>, <em>italic</em>, underline, strikethrough</li>
+                        <li>Change font family, font size, and text colors</li>
+                        <li>Insert images using the toolbar button</li>
+                        <li>Create ordered and bullet lists with indentation</li>
+                        <li>Align text (left, center, right, justify)</li>
                         <li>All formatting is preserved when saved</li>
                       </ul>
                     </div>
@@ -5804,6 +5886,7 @@ const AdminDashboard: React.FC = () => {
                             ...productForm,
                             basePrice: e.target.value,
                           });
+                          // Clear error when user starts typing
                           if (productFormErrors.basePrice) {
                             setProductFormErrors({ ...productFormErrors, basePrice: undefined });
                           }
@@ -5820,7 +5903,7 @@ const AdminDashboard: React.FC = () => {
                         </p>
                       )}
                     </div>
-                    {productForm.basePrice && parseFloat(productForm.basePrice) < 0 && (
+                    {productForm.basePrice && parseFloat(productForm.basePrice) < 0 && !productFormErrors.basePrice && (
                       <p className="text-xs text-red-600 mt-1">Price cannot be negative</p>
                     )}
                   </div>
@@ -5901,6 +5984,11 @@ const AdminDashboard: React.FC = () => {
                               subcategory: "", // Reset subcategory when category changes
                             });
                             
+                            // Clear error when user selects a category
+                            if (productFormErrors.category) {
+                              setProductFormErrors({ ...productFormErrors, category: undefined });
+                            }
+                            
                             // Immediately fetch children for this category
                             await fetchCategoryChildren(value);
                             
@@ -5927,9 +6015,15 @@ const AdminDashboard: React.FC = () => {
                               label: cat.name,
                             })),
                         ]}
-                        className="w-full"
+                        className={`w-full ${productFormErrors.category ? 'border-red-300' : ''}`}
                       />
-                      {!productForm.category && selectedType && (
+                      {productFormErrors.category && (
+                        <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                          <AlertCircle size={12} />
+                          {productFormErrors.category}
+                        </p>
+                      )}
+                      {!productForm.category && selectedType && !productFormErrors.category && (
                         <p className="mt-1 text-xs text-amber-600 flex items-center gap-1">
                           <AlertCircle size={12} />
                           Please select a category to continue
@@ -6585,6 +6679,7 @@ const AdminDashboard: React.FC = () => {
                           ...productForm,
                           gstPercentage: e.target.value,
                         });
+                        // Clear error when user starts typing
                         if (productFormErrors.gstPercentage) {
                           setProductFormErrors({ ...productFormErrors, gstPercentage: undefined });
                         }
@@ -6600,7 +6695,9 @@ const AdminDashboard: React.FC = () => {
                         {productFormErrors.gstPercentage}
                       </p>
                     )}
-                    <p className="text-xs text-red-600 mt-1 font-medium">CRITICAL: Required for invoice calculation</p>
+                    {!productFormErrors.gstPercentage && (
+                      <p className="text-xs text-red-600 mt-1 font-medium">CRITICAL: Required for invoice calculation</p>
+                    )}
                   </div>
                 </div>
 
@@ -6653,6 +6750,7 @@ const AdminDashboard: React.FC = () => {
                           ...productForm,
                           instructions: e.target.value,
                         });
+                        // Clear error when user starts typing
                         if (productFormErrors.instructions) {
                           setProductFormErrors({ ...productFormErrors, instructions: undefined });
                         }
@@ -6669,9 +6767,11 @@ const AdminDashboard: React.FC = () => {
                         {productFormErrors.instructions}
                       </p>
                     )}
-                    <p className="text-xs text-yellow-700 mt-2 font-medium">
-                      ⚠️ These instructions will be displayed to customers with a disclaimer that the company is not responsible if instructions are not followed.
-                    </p>
+                    {!productFormErrors.instructions && (
+                      <p className="text-xs text-yellow-700 mt-2 font-medium">
+                        ⚠️ These instructions will be displayed to customers with a disclaimer that the company is not responsible if instructions are not followed.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -11795,11 +11895,13 @@ const AdminDashboard: React.FC = () => {
                                 // Calculate price impact for this attribute
                                 const basePrice = selectedOrder.product.basePrice || 0;
                                 let attributeCost = 0;
+                                let pricePerUnit = 0;
                                 if (attr.priceAdd > 0) {
+                                  pricePerUnit = attr.priceAdd;
                                   attributeCost = attr.priceAdd * selectedOrder.quantity;
                                 } else if (attr.priceMultiplier && attr.priceMultiplier !== 1) {
-                                  const baseTotal = basePrice * selectedOrder.quantity;
-                                  attributeCost = baseTotal * (attr.priceMultiplier - 1);
+                                  pricePerUnit = basePrice * (attr.priceMultiplier - 1);
+                                  attributeCost = pricePerUnit * selectedOrder.quantity;
                                 }
                                 
                                 if (attributeCost === 0) return null;
@@ -11809,7 +11911,7 @@ const AdminDashboard: React.FC = () => {
                                     <span>
                                       {attr.attributeName} ({attr.label})
                                     </span>
-                                    <span>+{formatCurrency(attributeCost)}</span>
+                                    <span>+{formatCurrency(pricePerUnit)}/unit × {selectedOrder.quantity.toLocaleString()} = {formatCurrency(attributeCost)}</span>
                                   </div>
                                 );
                               })}
