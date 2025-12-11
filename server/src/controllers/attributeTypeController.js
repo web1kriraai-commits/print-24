@@ -140,6 +140,42 @@ export const getAllAttributeTypes = async (req, res) => {
   }
 };
 
+// Get unused attribute types (not used by any product)
+export const getUnusedAttributeTypes = async (req, res) => {
+  try {
+    const Product = (await import("../models/productModal.js")).default;
+    const mongoose = (await import("mongoose")).default;
+    
+    // Get all attribute types
+    const allAttributeTypes = await AttributeType.find({})
+      .sort({ displayOrder: 1, attributeName: 1 })
+      .populate('applicableCategories', 'name')
+      .populate('applicableSubCategories', 'name');
+    
+    // Get all attribute type IDs that are used in products
+    // Filter out null/undefined values
+    const usedAttributeTypeIds = (await Product.distinct("dynamicAttributes.attributeType"))
+      .filter(id => id != null)
+      .map(id => id.toString());
+    
+    // Filter out used attribute types
+    const unusedAttributeTypes = allAttributeTypes.filter(
+      (attrType) => {
+        const attrTypeIdStr = attrType._id.toString();
+        return !usedAttributeTypeIds.includes(attrTypeIdStr);
+      }
+    );
+
+    return res.json({
+      success: true,
+      data: unusedAttributeTypes,
+    });
+  } catch (err) {
+    console.log("GET UNUSED ATTRIBUTE TYPES ERROR ===>", err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
 // Get single attribute type
 export const getSingleAttributeType = async (req, res) => {
   try {
