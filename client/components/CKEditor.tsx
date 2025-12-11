@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Bold, Italic, Underline, List, Link as LinkIcon, Image as ImageIcon, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
+import { Bold, Italic, Underline, List, Link as LinkIcon, Image as ImageIcon, AlignLeft, AlignCenter, AlignRight, Upload, Loader, X } from 'lucide-react';
+import { API_BASE_URL_WITH_API } from '../lib/apiConfig';
 
 interface CKEditorProps {
   value: string;
@@ -18,6 +19,9 @@ const CKEditor: React.FC<CKEditorProps> = ({
   const [showImageDialog, setShowImageDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkText, setLinkText] = useState("");
 
@@ -98,7 +102,28 @@ const CKEditor: React.FC<CKEditorProps> = ({
   const execCommand = (command: string, value?: string) => {
     if (editorRef.current) {
       editorRef.current.focus();
-      document.execCommand(command, false, value);
+      
+      // Save selection before command
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) {
+        // If no selection, create a range at cursor position
+        const range = document.createRange();
+        range.selectNodeContents(editorRef.current);
+        range.collapse(false); // Collapse to end
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      }
+      
+      // Execute command
+      try {
+        const success = document.execCommand(command, false, value);
+        if (!success) {
+          console.warn(`Command ${command} failed`);
+        }
+      } catch (error) {
+        console.error(`Error executing command ${command}:`, error);
+      }
+      
       handleInput();
       
       // Ensure direction remains LTR after command
@@ -109,12 +134,155 @@ const CKEditor: React.FC<CKEditorProps> = ({
     }
   };
 
+  // Custom alignment function that works better with contentEditable
+  const setAlignment = (alignment: 'left' | 'center' | 'right') => {
+    if (!editorRef.current) return;
+    
+    editorRef.current.focus();
+    const selection = window.getSelection();
+    
+    if (!selection || selection.rangeCount === 0) {
+      // No selection - find or create block elements and align them
+      const blocks = editorRef.current.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6, li');
+      if (blocks.length > 0) {
+        blocks.forEach((block) => {
+          (block as HTMLElement).style.textAlign = alignment;
+        });
+      } else {
+        // No blocks found - wrap content in paragraph
+        const content = editorRef.current.innerHTML;
+        if (content.trim()) {
+          const p = document.createElement('p');
+          p.style.textAlign = alignment;
+          p.innerHTML = content;
+          editorRef.current.innerHTML = '';
+          editorRef.current.appendChild(p);
+        } else {
+          // Empty editor - create aligned paragraph
+          const p = document.createElement('p');
+          p.style.textAlign = alignment;
+          p.innerHTML = '<br>';
+          editorRef.current.appendChild(p);
+          // Set cursor in the paragraph
+          const range = document.createRange();
+          range.setStart(p, 0);
+          range.collapse(true);
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+        }
+      }
+      handleInput();
+      return;
+    }
+    
+    const range = selection.getRangeAt(0);
+    
+    // Find the parent block element (p, div, etc.)
+    let node: Node | null = range.commonAncestorContainer;
+    let blockElement: HTMLElement | null = null;
+    
+    // Walk up the DOM tree to find a block element
+    while (node && node !== editorRef.current) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const element = node as HTMLElement;
+        const tagName = element.tagName;
+        if (tagName === 'P' || tagName === 'DIV' || 
+            tagName === 'H1' || tagName === 'H2' || 
+            tagName === 'H3' || tagName === 'H4' ||
+            tagName === 'H5' || tagName === 'H6' ||
+            tagName === 'LI') {
+          blockElement = element;
+          break;
+        }
+      }
+      node = node.parentNode;
+    }
+    
+    // If we found a block element, align it
+    if (blockElement) {
+      blockElement.style.textAlign = alignment;
+      handleInput();
+      return;
+    }
+    
+    // No block element found - we need to create one
+    try {
+      // Check if there's selected text
+      const selectedText = range.toString();
+      
+      if (selectedText.trim()) {
+        // There's selected text - wrap it in a paragraph
+        const contents = range.extractContents();
+        const p = document.createElement('p');
+        p.style.textAlign = alignment;
+        p.appendChild(contents);
+        range.insertNode(p);
+        
+        // Move cursor after the paragraph
+        const newRange = document.createRange();
+        newRange.setStartAfter(p);
+        newRange.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(newRange);
+      } else {
+        // No text selected - find the current line/paragraph context
+        // Try to use formatBlock to create a paragraph
+        const success = document.execCommand('formatBlock', false, '<p>');
+        
+        if (success) {
+          // Find the newly created paragraph
+          const newRange = selection.getRangeAt(0);
+          let currentNode: Node | null = newRange.commonAncestorContainer;
+          while (currentNode && currentNode !== editorRef.current) {
+            if (currentNode.nodeType === Node.ELEMENT_NODE) {
+              const el = currentNode as HTMLElement;
+              if (el.tagName === 'P') {
+                el.style.textAlign = alignment;
+                handleInput();
+                return;
+              }
+            }
+            currentNode = currentNode.parentNode;
+          }
+        }
+        
+        // If formatBlock didn't work, manually create a paragraph
+        const p = document.createElement('p');
+        p.style.textAlign = alignment;
+        p.innerHTML = '<br>';
+        
+        // Insert at cursor position
+        range.insertNode(p);
+        
+        // Set cursor inside the paragraph
+        const newRange = document.createRange();
+        newRange.setStart(p, 0);
+        newRange.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(newRange);
+      }
+      
+      handleInput();
+    } catch (e) {
+      console.error('Error setting alignment:', e);
+      // Final fallback: try to align the entire editor
+      editorRef.current.style.textAlign = alignment;
+      handleInput();
+    }
+  };
+
   const handleInput = () => {
     if (editorRef.current) {
       // Ensure direction is always LTR
       editorRef.current.setAttribute('dir', 'ltr');
       editorRef.current.style.direction = 'ltr';
-      editorRef.current.style.textAlign = 'left';
+      
+      // Don't override text-align on the editor itself if paragraphs have their own alignment
+      // Only set left if no child elements have alignment
+      const hasAlignedChildren = editorRef.current.querySelectorAll('[style*="text-align"]').length > 0;
+      if (!hasAlignedChildren) {
+        editorRef.current.style.textAlign = 'left';
+      }
       
       onChange(editorRef.current.innerHTML);
     }
@@ -170,30 +338,109 @@ const CKEditor: React.FC<CKEditorProps> = ({
     }
   };
 
-  const insertImage = () => {
-    if (imageUrl.trim() && editorRef.current) {
-      const img = document.createElement('img');
-      img.src = imageUrl;
-      img.style.maxWidth = '100%';
-      img.style.height = 'auto';
-      img.style.display = 'block';
-      img.style.margin = '10px 0';
-      
-      const selection = window.getSelection();
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        range.deleteContents();
-        range.insertNode(img);
-        range.setStartAfter(img);
-        range.collapse(true);
-        selection.removeAllRanges();
-        selection.addRange(range);
-      } else {
-        editorRef.current.appendChild(img);
+  const handleImageFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
       }
       
-      editorRef.current.focus();
-      handleInput();
+      // Validate file size (10MB max)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('Image size must be less than 10MB');
+        return;
+      }
+      
+      setImageFile(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadAndInsertImage = async () => {
+    if (!imageFile) {
+      // If no file selected, try to use URL
+      if (imageUrl.trim() && editorRef.current) {
+        insertImageFromUrl(imageUrl);
+      }
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', imageFile);
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL_WITH_API}/upload-image`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to upload image');
+      }
+
+      // Insert the uploaded image
+      if (data.url && editorRef.current) {
+        insertImageFromUrl(data.url);
+      }
+    } catch (error) {
+      console.error('Image upload error:', error);
+      alert(error instanceof Error ? error.message : 'Failed to upload image. Please try again.');
+    } finally {
+      setUploadingImage(false);
+      setImageFile(null);
+      setImagePreview("");
+      setImageUrl("");
+      setShowImageDialog(false);
+    }
+  };
+
+  const insertImageFromUrl = (url: string) => {
+    if (!url.trim() || !editorRef.current) return;
+
+    const img = document.createElement('img');
+    img.src = url;
+    img.style.maxWidth = '100%';
+    img.style.height = 'auto';
+    img.style.display = 'block';
+    img.style.margin = '10px 0';
+    
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+      range.insertNode(img);
+      range.setStartAfter(img);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } else {
+      editorRef.current.appendChild(img);
+    }
+    
+    editorRef.current.focus();
+    handleInput();
+  };
+
+  const insertImage = () => {
+    if (imageFile) {
+      uploadAndInsertImage();
+    } else if (imageUrl.trim()) {
+      insertImageFromUrl(imageUrl);
       setImageUrl("");
       setShowImageDialog(false);
     }
@@ -262,16 +509,34 @@ const CKEditor: React.FC<CKEditorProps> = ({
   // Render editor with toolbar immediately - no loading state
   return (
     <div 
-      className={`border border-cream-300 rounded-lg overflow-hidden ${className}`}
-      onClick={(e) => e.stopPropagation()}
-      onMouseDown={(e) => e.stopPropagation()}
+      className={`ckeditor-container border border-cream-300 rounded-lg overflow-hidden ${className}`}
+      onClick={(e) => {
+        e.stopPropagation();
+      }}
+      onMouseDown={(e) => {
+        e.stopPropagation();
+      }}
+      onSubmit={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+      }}
     >
       {/* Toolbar */}
       <div 
         className="bg-cream-100 border-b border-cream-300 p-2 flex items-center gap-2 flex-wrap" 
         dir="ltr"
-        onClick={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+        }}
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+        }}
+        onSubmit={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+        }}
       >
         <button
           type="button"
@@ -279,12 +544,27 @@ const CKEditor: React.FC<CKEditorProps> = ({
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
             execCommand('bold');
             return false;
           }}
           onMouseDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+          }}
+          onMouseUp={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
           }}
           className="p-2 hover:bg-cream-200 rounded transition-colors"
           title="Bold"
@@ -297,12 +577,27 @@ const CKEditor: React.FC<CKEditorProps> = ({
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
             execCommand('italic');
             return false;
           }}
           onMouseDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+          }}
+          onMouseUp={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
           }}
           className="p-2 hover:bg-cream-200 rounded transition-colors"
           title="Italic"
@@ -315,12 +610,27 @@ const CKEditor: React.FC<CKEditorProps> = ({
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
             execCommand('underline');
             return false;
           }}
           onMouseDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+          }}
+          onMouseUp={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
           }}
           className="p-2 hover:bg-cream-200 rounded transition-colors"
           title="Underline"
@@ -334,12 +644,49 @@ const CKEditor: React.FC<CKEditorProps> = ({
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+            // Ensure we have a selection or create one
+            if (editorRef.current) {
+              editorRef.current.focus();
+              const selection = window.getSelection();
+              if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+                // If no selection, select all or create a paragraph
+                const range = document.createRange();
+                if (editorRef.current.textContent && editorRef.current.textContent.trim()) {
+                  range.selectNodeContents(editorRef.current);
+                } else {
+                  range.setStart(editorRef.current, 0);
+                  range.setEnd(editorRef.current, 0);
+                  // Insert a paragraph first
+                  const p = document.createElement('p');
+                  p.textContent = '\u200B'; // Zero-width space
+                  range.insertNode(p);
+                  range.selectNodeContents(p);
+                }
+                selection?.removeAllRanges();
+                selection?.addRange(range);
+              }
+            }
             execCommand('insertUnorderedList');
             return false;
           }}
           onMouseDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+          }}
+          onMouseUp={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
           }}
           className="p-2 hover:bg-cream-200 rounded transition-colors"
           title="Bullet List"
@@ -352,12 +699,49 @@ const CKEditor: React.FC<CKEditorProps> = ({
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+            // Ensure we have a selection or create one
+            if (editorRef.current) {
+              editorRef.current.focus();
+              const selection = window.getSelection();
+              if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+                // If no selection, select all or create a paragraph
+                const range = document.createRange();
+                if (editorRef.current.textContent && editorRef.current.textContent.trim()) {
+                  range.selectNodeContents(editorRef.current);
+                } else {
+                  range.setStart(editorRef.current, 0);
+                  range.setEnd(editorRef.current, 0);
+                  // Insert a paragraph first
+                  const p = document.createElement('p');
+                  p.textContent = '\u200B'; // Zero-width space
+                  range.insertNode(p);
+                  range.selectNodeContents(p);
+                }
+                selection?.removeAllRanges();
+                selection?.addRange(range);
+              }
+            }
             execCommand('insertOrderedList');
             return false;
           }}
           onMouseDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+          }}
+          onMouseUp={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
           }}
           className="p-2 hover:bg-cream-200 rounded transition-colors"
           title="Numbered List"
@@ -371,12 +755,27 @@ const CKEditor: React.FC<CKEditorProps> = ({
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
             setShowLinkDialog(true);
             return false;
           }}
           onMouseDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+          }}
+          onMouseUp={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
           }}
           className="p-2 hover:bg-cream-200 rounded transition-colors"
           title="Insert Link"
@@ -389,12 +788,27 @@ const CKEditor: React.FC<CKEditorProps> = ({
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
             setShowImageDialog(true);
             return false;
           }}
           onMouseDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+          }}
+          onMouseUp={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
           }}
           className="p-2 hover:bg-cream-200 rounded transition-colors"
           title="Insert Image"
@@ -408,12 +822,27 @@ const CKEditor: React.FC<CKEditorProps> = ({
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation?.();
-            execCommand('justifyLeft');
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+            setAlignment('left');
             return false;
           }}
           onMouseDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+          }}
+          onMouseUp={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
           }}
           className="p-2 hover:bg-cream-200 rounded transition-colors"
           title="Align Left"
@@ -426,12 +855,27 @@ const CKEditor: React.FC<CKEditorProps> = ({
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation?.();
-            execCommand('justifyCenter');
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+            setAlignment('center');
             return false;
           }}
           onMouseDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+          }}
+          onMouseUp={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
           }}
           className="p-2 hover:bg-cream-200 rounded transition-colors"
           title="Align Center"
@@ -444,12 +888,27 @@ const CKEditor: React.FC<CKEditorProps> = ({
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation?.();
-            execCommand('justifyRight');
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+            setAlignment('right');
             return false;
           }}
           onMouseDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
+          }}
+          onMouseUp={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation?.();
+            if (e.nativeEvent) {
+              e.nativeEvent.stopImmediatePropagation();
+            }
           }}
           className="p-2 hover:bg-cream-200 rounded transition-colors"
           title="Align Right"
@@ -481,11 +940,85 @@ const CKEditor: React.FC<CKEditorProps> = ({
       {showImageDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" dir="ltr">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold text-cream-900 mb-4">Insert Image</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-cream-900">Insert Image</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowImageDialog(false);
+                  setImageFile(null);
+                  setImagePreview("");
+                  setImageUrl("");
+                  editorRef.current?.focus();
+                }}
+                className="text-cream-500 hover:text-cream-700"
+              >
+                <X size={20} />
+              </button>
+            </div>
             <div className="space-y-4">
+              {/* File Upload Section */}
               <div>
                 <label className="block text-sm font-medium text-cream-900 mb-2">
-                  Image URL
+                  Select Image File
+                </label>
+                <div className="border-2 border-dashed border-cream-300 rounded-lg p-4 text-center hover:border-cream-400 transition-colors">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageFileSelect}
+                    className="hidden"
+                    id="image-upload-input"
+                    disabled={uploadingImage}
+                  />
+                  <label
+                    htmlFor="image-upload-input"
+                    className="cursor-pointer flex flex-col items-center gap-2"
+                  >
+                    <Upload size={24} className="text-cream-500" />
+                    <span className="text-sm text-cream-700">
+                      {imageFile ? imageFile.name : 'Click to select image'}
+                    </span>
+                    <span className="text-xs text-cream-500">JPG, PNG, WebP (Max 10MB)</span>
+                  </label>
+                </div>
+                {imagePreview && (
+                  <div className="mt-3 relative">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-full h-auto max-h-48 object-contain rounded-lg border border-cream-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImageFile(null);
+                        setImagePreview("");
+                        const input = document.getElementById('image-upload-input') as HTMLInputElement;
+                        if (input) input.value = '';
+                      }}
+                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* OR Divider */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-cream-300"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-cream-500">OR</span>
+                </div>
+              </div>
+
+              {/* URL Input Section */}
+              <div>
+                <label className="block text-sm font-medium text-cream-900 mb-2">
+                  Image URL (Alternative)
                 </label>
                 <input
                   type="url"
@@ -500,27 +1033,42 @@ const CKEditor: React.FC<CKEditorProps> = ({
                     } else if (e.key === 'Escape') {
                       setShowImageDialog(false);
                       setImageUrl("");
+                      setImageFile(null);
+                      setImagePreview("");
                     }
                   }}
-                  autoFocus
+                  disabled={uploadingImage || !!imageFile}
                 />
               </div>
+
+              {/* Action Buttons */}
               <div className="flex gap-3">
                 <button
                   type="button"
                   onClick={insertImage}
-                  className="flex-1 px-4 py-2 bg-cream-900 text-white rounded-lg hover:bg-cream-800 transition-colors"
+                  disabled={uploadingImage || (!imageFile && !imageUrl.trim())}
+                  className="flex-1 px-4 py-2 bg-cream-900 text-white rounded-lg hover:bg-cream-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  Insert
+                  {uploadingImage ? (
+                    <>
+                      <Loader size={16} className="animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    'Insert Image'
+                  )}
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     setShowImageDialog(false);
+                    setImageFile(null);
+                    setImagePreview("");
                     setImageUrl("");
                     editorRef.current?.focus();
                   }}
-                  className="flex-1 px-4 py-2 border border-cream-300 text-cream-700 rounded-lg hover:bg-cream-50 transition-colors"
+                  disabled={uploadingImage}
+                  className="flex-1 px-4 py-2 border border-cream-300 text-cream-700 rounded-lg hover:bg-cream-50 transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>

@@ -48,6 +48,9 @@ import {
   getAllReviews,
 } from "../controllers/reviewController.js";
 
+/* IMAGE UPLOAD CONTROLLER */
+import { uploadImage } from "../controllers/imageUploadController.js";
+
 /* ORDER CONTROLLERS */
 import {
   createOrder,
@@ -221,6 +224,11 @@ router.put(
 // Reviews route - authentication is optional (handled in controller)
 router.post("/reviews", optionalAuthMiddleware, createReview);
 router.get("/reviews", getAllReviews);
+
+/* =====================================
+   IMAGE UPLOAD ROUTES (for CKEditor)
+===================================== */
+router.post("/upload-image", authMiddleware, upload.single("image"), uploadImage);
 
 /* =====================================
    ORDER ROUTES

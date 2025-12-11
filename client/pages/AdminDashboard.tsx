@@ -355,7 +355,7 @@ const AdminDashboard: React.FC = () => {
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryImage, setEditingCategoryImage] = useState<string | null>(null);
-  
+
   // Field-level error states for inline validation messages
   const [productFormErrors, setProductFormErrors] = useState<{
     name?: string;
@@ -2487,7 +2487,6 @@ const AdminDashboard: React.FC = () => {
   const fetchAttributeTypes = async () => {
     setLoadingAttributeTypes(true);
     try {
-      // Fetch all attribute types with usage status
       const url = `${API_BASE_URL}/attribute-types`;
       console.log("Fetching attribute types from:", url);
       
@@ -2665,6 +2664,7 @@ const AdminDashboard: React.FC = () => {
 
   const handleAttributeTypeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -2674,28 +2674,36 @@ const AdminDashboard: React.FC = () => {
       const fullAttributeType = convertFormToAttributeType();
       
       // Validate required fields with auto-scroll
+      setAttributeFormErrors({});
+      let hasErrors = false;
+      const errors: typeof attributeFormErrors = {};
+
       if (!fullAttributeType.attributeName) {
-        setError("Attribute name is required");
-        setLoading(false);
-        scrollToInvalidField("attributeName", "attribute-name");
-        return;
+        errors.attributeName = "Attribute name is required";
+        hasErrors = true;
       }
       if (!fullAttributeType.functionType) {
-        setError("Function type is required");
-        setLoading(false);
-        scrollToInvalidField("functionType", "attribute-functionType");
-        return;
+        errors.functionType = "Function type is required";
+        hasErrors = true;
       }
       if (!fullAttributeType.inputStyle) {
-        setError("Input style is required");
-        setLoading(false);
-        scrollToInvalidField("inputStyle", "attribute-inputStyle");
-        return;
+        errors.inputStyle = "Input style is required";
+        hasErrors = true;
       }
       if (!fullAttributeType.primaryEffectType) {
-        setError("Primary effect type is required");
+        errors.primaryEffectType = "Primary effect type is required";
+        hasErrors = true;
+      }
+
+      if (hasErrors) {
+        setAttributeFormErrors(errors);
+        setError("Please fix the errors below");
         setLoading(false);
-        scrollToInvalidField("primaryEffectType", "attribute-primaryEffectType");
+        const firstErrorField = Object.keys(errors)[0];
+        if (firstErrorField === 'attributeName') scrollToInvalidField("attributeName", "attribute-name");
+        else if (firstErrorField === 'functionType') scrollToInvalidField("functionType", "attribute-functionType");
+        else if (firstErrorField === 'inputStyle') scrollToInvalidField("inputStyle", "attribute-inputStyle");
+        else if (firstErrorField === 'primaryEffectType') scrollToInvalidField("primaryEffectType", "attribute-primaryEffectType");
         return;
       }
       
@@ -2947,12 +2955,10 @@ const AdminDashboard: React.FC = () => {
     setSuccess(null);
 
     try {
-      // Clear previous errors
       setDepartmentFormErrors({});
-      setError(null);
-      
       if (!departmentForm.name.trim()) {
         setDepartmentFormErrors({ name: "Department name is required" });
+        setError("Department name is required");
         setLoading(false);
         scrollToInvalidField("name", "department-name");
         return;
@@ -3073,13 +3079,10 @@ const AdminDashboard: React.FC = () => {
     setSuccess(null);
 
     try {
-      // Clear previous errors
       setSequenceFormErrors({});
-      setError(null);
-      
       let hasErrors = false;
       const errors: typeof sequenceFormErrors = {};
-      
+
       if (!sequenceForm.name.trim()) {
         errors.name = "Sequence name is required";
         hasErrors = true;
@@ -3098,9 +3101,10 @@ const AdminDashboard: React.FC = () => {
         errors.selectedDepartments = "At least one department must be selected";
         hasErrors = true;
       }
-      
+
       if (hasErrors) {
         setSequenceFormErrors(errors);
+        setError("Please fix the errors below");
         setLoading(false);
         const firstErrorField = Object.keys(errors)[0];
         if (firstErrorField === 'name') scrollToInvalidField("name", "sequence-name");
@@ -3325,19 +3329,17 @@ const AdminDashboard: React.FC = () => {
 
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setLoading(true);
     setError(null);
     setSuccess(null);
+    setProductFormErrors({});
 
     try {
-      // Clear previous errors
-      setProductFormErrors({});
-      setError(null);
-      
       // Validate required fields with auto-scroll and field-level errors
       let hasErrors = false;
       const errors: typeof productFormErrors = {};
-      
+
       if (!productForm.name || !productForm.name.trim()) {
         errors.name = "Product name is required";
         hasErrors = true;
@@ -3380,9 +3382,10 @@ const AdminDashboard: React.FC = () => {
         errors.instructions = "Instructions are required";
         hasErrors = true;
       }
-      
+
       if (hasErrors) {
         setProductFormErrors(errors);
+        setError("Please fix the errors below");
         setLoading(false);
         // Scroll to first error field
         const firstErrorField = Object.keys(errors)[0];
@@ -4093,21 +4096,18 @@ const AdminDashboard: React.FC = () => {
     setSuccess(null);
 
     try {
-      // Clear previous errors
       setCategoryFormErrors({});
-      setError(null);
-      
-      // Validate form fields with auto-scroll and field-level errors
       let hasErrors = false;
       const errors: typeof categoryFormErrors = {};
-      
+
       if (!categoryForm.name || categoryForm.name.trim() === "") {
         errors.name = "Category name is required";
         hasErrors = true;
       }
-      
+
       if (hasErrors) {
         setCategoryFormErrors(errors);
+        setError("Please fix the errors below");
         setLoading(false);
         const firstErrorField = Object.keys(errors)[0];
         if (firstErrorField === 'name') scrollToInvalidField("name", "category-name");
@@ -4128,9 +4128,10 @@ const AdminDashboard: React.FC = () => {
           errors.image = "Subcategory image is required. Please upload an image";
           hasErrors = true;
         }
-        
+
         if (hasErrors) {
           setCategoryFormErrors(errors);
+          setError("Please fix the errors below");
           setLoading(false);
           const firstErrorField = Object.keys(errors)[0];
           if (firstErrorField === 'image') scrollToInvalidField("image", "category-image");
@@ -4206,17 +4207,23 @@ const AdminDashboard: React.FC = () => {
       } else {
         // No parent selected - create/update as regular category
         if (!categoryForm.type) {
-          setError("Category type is required.");
-          setLoading(false);
-          scrollToInvalidField("type", "category-type");
-          return;
+          errors.type = "Category type is required";
+          hasErrors = true;
         }
 
         // Image is required when creating (not when updating)
         if (!editingCategoryId && !categoryForm.image) {
-          setError("Category image is required. Please upload an image.");
+          errors.image = "Category image is required. Please upload an image";
+          hasErrors = true;
+        }
+
+        if (hasErrors) {
+          setCategoryFormErrors(errors);
+          setError("Please fix the errors below");
           setLoading(false);
-          scrollToInvalidField("image", "category-image");
+          const firstErrorField = Object.keys(errors)[0];
+          if (firstErrorField === 'type') scrollToInvalidField("type", "category-type");
+          else if (firstErrorField === 'image') scrollToInvalidField("image", "category-image");
           return;
         }
 
@@ -4300,13 +4307,10 @@ const AdminDashboard: React.FC = () => {
     setSuccess(null);
 
     try {
-      // Clear previous errors
       setSubCategoryFormErrors({});
-      setError(null);
-      
       let hasErrors = false;
       const errors: typeof subCategoryFormErrors = {};
-      
+
       if (!subCategoryForm.name || subCategoryForm.name.trim() === "") {
         errors.name = "Subcategory name is required";
         hasErrors = true;
@@ -4322,9 +4326,10 @@ const AdminDashboard: React.FC = () => {
         errors.image = "Subcategory image is required. Please upload an image";
         hasErrors = true;
       }
-      
+
       if (hasErrors) {
         setSubCategoryFormErrors(errors);
+        setError("Please fix the errors below");
         setLoading(false);
         const firstErrorField = Object.keys(errors)[0];
         if (firstErrorField === 'name') scrollToInvalidField("name", "subcategory-name");
@@ -4941,7 +4946,13 @@ const AdminDashboard: React.FC = () => {
         <div className="bg-white rounded-2xl shadow-lg p-6">
           {/* Add/Edit Product */}
           {activeTab === "products" && (
-            <form onSubmit={handleProductSubmit} className="space-y-6">
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleProductSubmit(e);
+              }} 
+              className="space-y-6"
+            >
               {editingProductId && (
                 <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
                   <p className="text-sm text-blue-800 font-medium">
@@ -5035,7 +5046,7 @@ const AdminDashboard: React.FC = () => {
                         {productFormErrors.name}
                       </p>
                     )}
-                    {productForm.name && productForm.name.length > 80 && !productFormErrors.name && (
+                    {productForm.name && productForm.name.length > 80 && (
                       <p className="text-xs text-yellow-600 mt-1">
                         {100 - productForm.name.length} characters remaining
                       </p>
@@ -5052,16 +5063,25 @@ const AdminDashboard: React.FC = () => {
                         </div>
                       </div>
                     </label>
-                    <CKEditor
-                      value={productForm.description}
-                      onChange={(html) =>
-                        setProductForm({
-                          ...productForm,
-                          description: html,
-                        })
-                      }
-                      placeholder="Enter product description. Use the toolbar to format text, insert images, links, and more."
-                    />
+                    <div 
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onSubmit={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                      }}
+                    >
+                      <CKEditor
+                        value={productForm.description}
+                        onChange={(html) =>
+                          setProductForm({
+                            ...productForm,
+                            description: html,
+                          })
+                        }
+                        placeholder="Enter product description. Use the toolbar to format text, insert images, links, and more."
+                      />
+                    </div>
                     <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                       <p className="text-xs font-medium text-blue-900 mb-1">💡 CKEditor Features:</p>
                       <ul className="text-xs text-blue-800 space-y-1 list-disc list-inside">
@@ -5655,9 +5675,6 @@ const AdminDashboard: React.FC = () => {
                               category: value,
                               subcategory: "", // Reset subcategory when category changes
                             });
-                            if (productFormErrors.category) {
-                              setProductFormErrors({ ...productFormErrors, category: undefined });
-                            }
                             
                             // Immediately fetch children for this category
                             await fetchCategoryChildren(value);
@@ -5687,12 +5704,6 @@ const AdminDashboard: React.FC = () => {
                         ]}
                         className="w-full"
                       />
-                      {productFormErrors.category && (
-                        <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                          <AlertCircle size={12} />
-                          {productFormErrors.category}
-                        </p>
-                      )}
                       {!productForm.category && selectedType && (
                         <p className="mt-1 text-xs text-amber-600 flex items-center gap-1">
                           <AlertCircle size={12} />
@@ -6989,6 +7000,7 @@ const AdminDashboard: React.FC = () => {
               {/* Create Attribute Modal - Full Form */}
               {showCreateAttributeModal && (
                 <div 
+                  data-modal="true"
                   className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
                   onClick={(e) => {
                     if (e.target === e.currentTarget) {
@@ -6997,8 +7009,11 @@ const AdminDashboard: React.FC = () => {
                   }}
                 >
                   <div 
+                    data-modal="true"
                     className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto"
                     onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onSubmit={(e) => e.stopPropagation()}
                   >
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-xl font-bold text-cream-900">Create New Attribute Type</h3>
@@ -7039,7 +7054,14 @@ const AdminDashboard: React.FC = () => {
                         <X size={24} />
                       </button>
                     </div>
-                    <form onSubmit={handleAttributeTypeSubmit} className="space-y-6">
+                    <form 
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleAttributeTypeSubmit(e);
+                      }} 
+                      className="space-y-6"
+                    >
                       {/* Step 1: Basic Information */}
                       <div className="border-b border-cream-200 pb-4">
                         <h3 className="text-lg font-semibold text-cream-900 mb-4">Basic Information</h3>
@@ -7053,11 +7075,24 @@ const AdminDashboard: React.FC = () => {
                               name="attributeName"
                               type="text"
                               value={attributeTypeForm.attributeName}
-                              onChange={(e) => setAttributeTypeForm({ ...attributeTypeForm, attributeName: e.target.value })}
-                              className="w-full px-3 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-900 focus:border-transparent"
+                              onChange={(e) => {
+                                setAttributeTypeForm({ ...attributeTypeForm, attributeName: e.target.value });
+                                if (attributeFormErrors.attributeName) {
+                                  setAttributeFormErrors({ ...attributeFormErrors, attributeName: undefined });
+                                }
+                              }}
+                              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-cream-900 focus:border-transparent ${
+                                attributeFormErrors.attributeName ? 'border-red-300 bg-red-50' : 'border-cream-300'
+                              }`}
                               placeholder="e.g., Printing Option, Paper Type"
                               required
                             />
+                            {attributeFormErrors.attributeName && (
+                              <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                                <AlertCircle size={12} />
+                                {attributeFormErrors.attributeName}
+                              </p>
+                            )}
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-cream-900 mb-2">
@@ -7637,12 +7672,14 @@ const AdminDashboard: React.FC = () => {
                     }
                     setCategoryForm({ ...categoryForm, name: newName, slug: newSlug });
                     setError(null); // Clear error when user starts typing
-                    if (categoryFormErrors.name) {
-                      setCategoryFormErrors({ ...categoryFormErrors, name: undefined });
+                  }}
+                  onBlur={() => {
+                    if (!categoryForm.name.trim()) {
+                      setError("Category name is required.");
                     }
                   }}
                   className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500 ${
-                    categoryFormErrors.name ? 'border-red-300 bg-red-50' : 'border-cream-300'
+                    (error && !categoryForm.name.trim()) || (!categoryForm.name.trim() && categoryForm.name !== "") ? 'border-red-300 bg-red-50' : 'border-cream-300'
                   }`}
                   placeholder="Enter category name"
                 />
@@ -7704,9 +7741,6 @@ const AdminDashboard: React.FC = () => {
                       parent: ""
                     });
                     setError(null); // Clear error when user selects type
-                    if (categoryFormErrors.type) {
-                      setCategoryFormErrors({ ...categoryFormErrors, type: undefined });
-                    }
                     // Refresh available parent categories filtered by type
                     // Use setTimeout to ensure state is updated before fetching
                     setTimeout(() => {
@@ -7723,12 +7757,6 @@ const AdminDashboard: React.FC = () => {
                   ]}
                   className="w-full"
                 />
-                {categoryFormErrors.type && (
-                  <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                    <AlertCircle size={12} />
-                    {categoryFormErrors.type}
-                  </p>
-                )}
                 {error && !categoryForm.type && (
                   <p className="mt-1 text-xs text-red-600">Category type is required</p>
                 )}
@@ -7978,20 +8006,20 @@ const AdminDashboard: React.FC = () => {
                   <label className="block text-sm font-medium text-cream-900 mb-2">
                     Parent Category <span className="text-red-500">*</span>
                   </label>
-                  <ReviewFilterDropdown
-                    id="subcategory-category"
-                    label="Select Category"
-                    value={subCategoryForm.category === "pending" ? "" : (subCategoryForm.category || "")}
-                    onChange={(value) => {
-                      setSubCategoryForm({
-                        ...subCategoryForm,
-                        category: (value || "") as string,
-                      });
-                      setError(null);
-                      if (subCategoryFormErrors.category) {
-                        setSubCategoryFormErrors({ ...subCategoryFormErrors, category: undefined });
-                      }
-                    }}
+                    <ReviewFilterDropdown
+                      id="subcategory-category"
+                      label="Select Category"
+                      value={subCategoryForm.category === "pending" ? "" : (subCategoryForm.category || "")}
+                      onChange={(value) => {
+                        setSubCategoryForm({
+                          ...subCategoryForm,
+                          category: (value || "") as string,
+                        });
+                        setError(null);
+                        if (subCategoryFormErrors.category) {
+                          setSubCategoryFormErrors({ ...subCategoryFormErrors, category: undefined });
+                        }
+                      }}
                     options={[
                       { value: "", label: "Select Category" },
                       ...categories
@@ -8007,12 +8035,6 @@ const AdminDashboard: React.FC = () => {
                     ]}
                     className="w-full"
                   />
-                  {subCategoryFormErrors.category && (
-                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                      <AlertCircle size={12} />
-                      {subCategoryFormErrors.category}
-                    </p>
-                  )}
                   {error && (!subCategoryForm.category || subCategoryForm.category === "pending") && subCategoryForm.type && (
                     <p className="mt-1 text-xs text-red-600">Parent category is required</p>
                   )}
@@ -9963,7 +9985,6 @@ const AdminDashboard: React.FC = () => {
                             <th className="px-4 py-3 text-left text-sm font-medium text-cream-900">Effect Type</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-cream-900">Pricing</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-cream-900">Common</th>
-                            <th className="px-4 py-3 text-center text-sm font-medium text-cream-900">In Use</th>
                             <th className="px-4 py-3 text-center text-sm font-medium text-cream-900">Actions</th>
                           </tr>
                         </thead>
@@ -9982,13 +10003,6 @@ const AdminDashboard: React.FC = () => {
                               <td className="px-4 py-3 text-sm text-cream-600">{at.primaryEffectType}</td>
                               <td className="px-4 py-3 text-sm text-cream-600">{at.isPricingAttribute ? "Yes" : "No"}</td>
                               <td className="px-4 py-3 text-sm text-cream-600">{at.isCommonAttribute ? "Yes" : "No"}</td>
-                              <td className="px-4 py-3 text-center">
-                                {at.isUsed ? (
-                                  <CheckCircle2 size={20} className="text-green-600 mx-auto" title="This attribute is currently used in products" />
-                                ) : (
-                                  <XCircle size={20} className="text-gray-400 mx-auto" title="This attribute is not used in any products" />
-                                )}
-                              </td>
                               <td className="px-4 py-3 text-center">
                                 <div className="flex items-center justify-center gap-2">
                                   <button
@@ -10371,9 +10385,6 @@ const AdminDashboard: React.FC = () => {
                                 category: value,
                                 subcategory: "", // Reset subcategory when category changes
                               });
-                              if (sequenceFormErrors.category) {
-                                setSequenceFormErrors({ ...sequenceFormErrors, category: undefined });
-                              }
                             }}
                             options={[
                               { value: "", label: "Select Category" },
@@ -10397,12 +10408,6 @@ const AdminDashboard: React.FC = () => {
                             ]}
                             className="w-full"
                           />
-                          {sequenceFormErrors.category && (
-                            <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                              <AlertCircle size={12} />
-                              {sequenceFormErrors.category}
-                            </p>
-                          )}
                         </div>
 
                         <div>
