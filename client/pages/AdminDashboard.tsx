@@ -2487,6 +2487,7 @@ const AdminDashboard: React.FC = () => {
   const fetchAttributeTypes = async () => {
     setLoadingAttributeTypes(true);
     try {
+      // Fetch all attribute types with usage status
       const url = `${API_BASE_URL}/attribute-types`;
       console.log("Fetching attribute types from:", url);
       
@@ -9962,6 +9963,7 @@ const AdminDashboard: React.FC = () => {
                             <th className="px-4 py-3 text-left text-sm font-medium text-cream-900">Effect Type</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-cream-900">Pricing</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-cream-900">Common</th>
+                            <th className="px-4 py-3 text-center text-sm font-medium text-cream-900">In Use</th>
                             <th className="px-4 py-3 text-center text-sm font-medium text-cream-900">Actions</th>
                           </tr>
                         </thead>
@@ -9980,6 +9982,13 @@ const AdminDashboard: React.FC = () => {
                               <td className="px-4 py-3 text-sm text-cream-600">{at.primaryEffectType}</td>
                               <td className="px-4 py-3 text-sm text-cream-600">{at.isPricingAttribute ? "Yes" : "No"}</td>
                               <td className="px-4 py-3 text-sm text-cream-600">{at.isCommonAttribute ? "Yes" : "No"}</td>
+                              <td className="px-4 py-3 text-center">
+                                {at.isUsed ? (
+                                  <CheckCircle2 size={20} className="text-green-600 mx-auto" title="This attribute is currently used in products" />
+                                ) : (
+                                  <XCircle size={20} className="text-gray-400 mx-auto" title="This attribute is not used in any products" />
+                                )}
+                              </td>
                               <td className="px-4 py-3 text-center">
                                 <div className="flex items-center justify-center gap-2">
                                   <button

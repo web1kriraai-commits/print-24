@@ -432,9 +432,25 @@ export const deleteCategory = async (req, res) => {
       });
     }
 
-    // Check for related subcategories (backward compatibility)
+    // Check for related subcategories
     const relatedSubCategories = await SubCategory.find({ category: categoryId });
     if (relatedSubCategories.length > 0) {
+      // Get all subcategory IDs that belong to this category
+      const subcategoryIds = relatedSubCategories.map(sub => sub._id);
+      
+      // Check if any products are using these subcategories
+      const productsWithSubcategories = await Product.find({ 
+        subcategory: { $in: subcategoryIds } 
+      });
+      
+      if (productsWithSubcategories.length > 0) {
+        return res.status(400).json({ 
+          error: `Cannot delete category. There are ${productsWithSubcategories.length} product(s) associated with subcategories under this category. Please delete or reassign the products first.` 
+        });
+      }
+      
+      // If no products are using the subcategories, still prevent deletion if subcategories exist
+      // User must delete or reassign subcategories first
       return res.status(400).json({ 
         error: `Cannot delete category. There are ${relatedSubCategories.length} subcategory(ies) associated with this category. Please delete or reassign the subcategories first.` 
       });
