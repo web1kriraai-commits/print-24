@@ -73,6 +73,7 @@ import {
 import {
   createAttributeType,
   getAllAttributeTypes,
+  getUnusedAttributeTypes,
   getSingleAttributeType,
   updateAttributeType,
   deleteAttributeType,
@@ -248,6 +249,7 @@ router.put(
 router.post("/attribute-types", authMiddleware, adminAuth, createAttributeType);
 
 router.get("/attribute-types", getAllAttributeTypes);
+router.get("/attribute-types/unused/list", getUnusedAttributeTypes);
 router.get("/attribute-types/:id", getSingleAttributeType);
 router.put(
   "/attribute-types/:id",
