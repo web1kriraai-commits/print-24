@@ -375,6 +375,7 @@ const AdminDashboard: React.FC = () => {
     functionType?: string;
     inputStyle?: string;
     primaryEffectType?: string;
+    attributeValues?: string;
   }>({});
   const [departmentFormErrors, setDepartmentFormErrors] = useState<{
     name?: string;
@@ -608,16 +609,22 @@ const AdminDashboard: React.FC = () => {
   const [attributeTypeForm, setAttributeTypeForm] = useState({
     attributeName: "",
     inputStyle: "DROPDOWN", // How customer selects
+    attributeImage: null as File | null, // Image to be shown when selecting this attribute
     effectDescription: "", // What this affects - description textbox
     // Options for dropdown/radio - simple list (e.g., "100, 200, 300")
     simpleOptions: "", // Comma-separated options like "100, 200, 300"
     // Checkboxes
     isPriceEffect: false, // Checkbox: Does this affect price?
-    isFixedQuantity: false, // Checkbox: Is this a fixed quantity attribute?
+    isStepQuantity: false, // Checkbox: Is this a step quantity attribute?
+    isRangeQuantity: false, // Checkbox: Is this a range quantity attribute?
     // Conditional fields based on checkboxes
     priceEffectAmount: "", // If isPriceEffect is true: how much price effect (per 1000 units)
-    fixedQuantityMin: "", // If isFixedQuantity is true: minimum quantity
-    fixedQuantityMax: "", // If isFixedQuantity is true: maximum quantity
+    stepQuantities: [] as Array<{ quantity: string; price: string }>, // Step quantities with prices
+    rangeQuantities: [] as Array<{ min: string; max: string; price: string }>, // Range quantities with prices
+    // Legacy fields (kept for backward compatibility)
+    isFixedQuantity: false, // Legacy: Is this a fixed quantity attribute?
+    fixedQuantityMin: "", // Legacy: minimum quantity
+    fixedQuantityMax: "", // Legacy: maximum quantity
     // Conditional fields based on primaryEffectType (kept for backward compatibility)
     primaryEffectType: "INFORMATIONAL", // What this affects
     priceImpactPer1000: "", // If affects PRICE: price change per 1000 units (e.g., "20" = +₹20 per 1000)
@@ -909,6 +916,15 @@ const AdminDashboard: React.FC = () => {
     }
   }, [productForm.category, categoryChildrenMap, productForm.subcategory]);
 
+  // Refetch attribute types when category/subcategory changes (to show relevant attributes)
+  useEffect(() => {
+    if (activeTab === "products" && (productForm.category || productForm.subcategory)) {
+      const categoryId = productForm.category || null;
+      const subCategoryId = productForm.subcategory || null;
+      fetchAttributeTypes(categoryId, subCategoryId);
+    }
+  }, [productForm.category, productForm.subcategory, activeTab]);
+
   // Auto-select department in sequence form if only one available
   useEffect(() => {
     const enabledDepartments = departments.filter((d: any) => d.isEnabled);
@@ -960,6 +976,44 @@ const AdminDashboard: React.FC = () => {
     }
     
     return headers;
+  };
+
+  // Generate unique slug by checking existing categories and subcategories
+  const generateUniqueSlug = (baseSlug: string, excludeCategoryId?: string | null, excludeSubCategoryId?: string | null): string => {
+    if (!baseSlug) return "";
+    
+    let slug = baseSlug.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    let uniqueSlug = slug;
+    let counter = 2;
+    
+    // Check if slug exists in categories or subcategories (excluding current item if editing)
+    let categoryExists = categories.some(cat => 
+      cat.slug === uniqueSlug && 
+      (!excludeCategoryId || cat._id !== excludeCategoryId)
+    );
+    
+    let subCategoryExists = subCategories.some(subCat => 
+      subCat.slug === uniqueSlug && 
+      (!excludeSubCategoryId || subCat._id !== excludeSubCategoryId)
+    );
+    
+    // If slug exists, append number until unique
+    while (categoryExists || subCategoryExists) {
+      uniqueSlug = `${slug}-${counter}`;
+      counter++;
+      
+      // Re-check with new slug
+      categoryExists = categories.some(cat => 
+        cat.slug === uniqueSlug && 
+        (!excludeCategoryId || cat._id !== excludeCategoryId)
+      );
+      subCategoryExists = subCategories.some(subCat => 
+        subCat.slug === uniqueSlug && 
+        (!excludeSubCategoryId || subCat._id !== excludeSubCategoryId)
+      );
+    }
+    
+    return uniqueSlug;
   };
 
   // Helper function to handle API responses
@@ -2485,10 +2539,21 @@ const AdminDashboard: React.FC = () => {
   };
 
   // Attribute Type Management Functions
-  const fetchAttributeTypes = async () => {
+  const fetchAttributeTypes = async (categoryId?: string, subCategoryId?: string) => {
     setLoadingAttributeTypes(true);
     try {
-      const url = `${API_BASE_URL}/attribute-types`;
+      // Build URL with optional filters for category/subcategory
+      let url = `${API_BASE_URL}/attribute-types`;
+      const params = new URLSearchParams();
+      
+      // Filter by category/subcategory if provided
+      if (categoryId) params.append('categoryId', categoryId);
+      if (subCategoryId) params.append('subCategoryId', subCategoryId);
+      
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
       console.log("Fetching attribute types from:", url);
       
       const response = await fetch(url, {
@@ -2510,7 +2575,39 @@ const AdminDashboard: React.FC = () => {
       }
       
       const data = await handleNgrokResponse(response);
-      setAttributeTypes(data.data || data || []);
+      const fetchedAttributes = data.data || data || [];
+      
+      // Filter to show common attributes and applicable ones
+      const filteredAttributes = fetchedAttributes.filter((attr: any) => {
+        // Always show common attributes
+        if (attr.isCommonAttribute) return true;
+        
+        // If no category/subcategory filter, show all
+        if (!categoryId && !subCategoryId) return true;
+        
+        // Check if attribute is applicable to current category/subcategory
+        const applicableCategories = attr.applicableCategories || [];
+        const applicableSubCategories = attr.applicableSubCategories || [];
+        
+        // If no restrictions, show it
+        if (applicableCategories.length === 0 && applicableSubCategories.length === 0) return true;
+        
+        // Check category match
+        if (categoryId && applicableCategories.some((cat: any) => {
+          const catId = typeof cat === 'object' && cat !== null ? cat._id : cat;
+          return catId === categoryId;
+        })) return true;
+        
+        // Check subcategory match
+        if (subCategoryId && applicableSubCategories.some((subCat: any) => {
+          const subCatId = typeof subCat === 'object' && subCat !== null ? subCat._id : subCat;
+          return subCatId === subCategoryId;
+        })) return true;
+        
+        return false;
+      });
+      
+      setAttributeTypes(filteredAttributes);
     } catch (err) {
       console.error("Error fetching attribute types:", err);
       // If it's a 404, just set empty array instead of showing error
@@ -2696,6 +2793,14 @@ const AdminDashboard: React.FC = () => {
         hasErrors = true;
       }
 
+      // Validate attribute values for dropdown/radio/popup
+      if (['DROPDOWN', 'RADIO', 'POPUP'].includes(fullAttributeType.inputStyle)) {
+        if (!fullAttributeType.attributeValues || fullAttributeType.attributeValues.length < 2) {
+          errors.attributeValues = `${fullAttributeType.inputStyle} requires at least 2 options. Please add options in the table above.`;
+          hasErrors = true;
+        }
+      }
+
       if (hasErrors) {
         setAttributeFormErrors(errors);
         setError("Please fix the errors below");
@@ -2705,6 +2810,13 @@ const AdminDashboard: React.FC = () => {
         else if (firstErrorField === 'functionType') scrollToInvalidField("functionType", "attribute-functionType");
         else if (firstErrorField === 'inputStyle') scrollToInvalidField("inputStyle", "attribute-inputStyle");
         else if (firstErrorField === 'primaryEffectType') scrollToInvalidField("primaryEffectType", "attribute-primaryEffectType");
+        else if (firstErrorField === 'attributeValues') {
+          // Scroll to options table
+          const optionsTable = document.querySelector('[data-attribute-options-table]');
+          if (optionsTable) {
+            optionsTable.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
         return;
       }
       
@@ -2748,11 +2860,16 @@ const AdminDashboard: React.FC = () => {
       setAttributeTypeForm({
         attributeName: "",
         inputStyle: "DROPDOWN",
+        attributeImage: null,
         effectDescription: "",
         simpleOptions: "",
         isPriceEffect: false,
-        isFixedQuantity: false,
+        isStepQuantity: false,
+        isRangeQuantity: false,
         priceEffectAmount: "",
+        stepQuantities: [],
+        rangeQuantities: [],
+        isFixedQuantity: false,
         fixedQuantityMin: "",
         fixedQuantityMax: "",
         primaryEffectType: "INFORMATIONAL",
@@ -2861,11 +2978,16 @@ const AdminDashboard: React.FC = () => {
       setAttributeTypeForm({
         attributeName: attributeType.attributeName || "",
         inputStyle: attributeType.inputStyle || "DROPDOWN",
+        attributeImage: null, // File will be set separately if needed
         effectDescription: attributeType.effectDescription || "",
         simpleOptions: simpleOptions,
         isPriceEffect: isPriceEffect,
-        isFixedQuantity: isFixedQuantity,
+        isStepQuantity: (attributeType as any).isStepQuantity || false,
+        isRangeQuantity: (attributeType as any).isRangeQuantity || false,
         priceEffectAmount: priceEffectAmount,
+        stepQuantities: (attributeType as any).stepQuantities || [],
+        rangeQuantities: (attributeType as any).rangeQuantities || [],
+        isFixedQuantity: isFixedQuantity,
         fixedQuantityMin: fixedQuantityMin,
         fixedQuantityMax: fixedQuantityMax,
         primaryEffectType: attributeType.primaryEffectType || "INFORMATIONAL",
@@ -3611,16 +3733,19 @@ const AdminDashboard: React.FC = () => {
       }
 
       // Append dynamic attributes (attribute types assigned to this product)
-      if (selectedAttributeTypes && selectedAttributeTypes.length > 0) {
-        const dynamicAttributesToSend = selectedAttributeTypes.map((sa) => ({
-          attributeType: sa.attributeTypeId,
-          isEnabled: sa.isEnabled,
-          isRequired: sa.isRequired,
-          displayOrder: sa.displayOrder,
-          customValues: [], // Can be customized per product if needed
-        }));
-        formData.append("dynamicAttributes", JSON.stringify(dynamicAttributesToSend));
-      }
+      // Always send dynamicAttributes, even if empty array, to ensure proper handling
+      const dynamicAttributesToSend = (selectedAttributeTypes && selectedAttributeTypes.length > 0)
+        ? selectedAttributeTypes
+            .filter((sa) => sa && sa.attributeTypeId) // Filter out invalid entries
+            .map((sa) => ({
+              attributeType: sa.attributeTypeId,
+              isEnabled: sa.isEnabled !== undefined ? sa.isEnabled : true,
+              isRequired: sa.isRequired !== undefined ? sa.isRequired : false,
+              displayOrder: sa.displayOrder !== undefined ? sa.displayOrder : 0,
+              customValues: [], // Can be customized per product if needed
+            }))
+        : [];
+      formData.append("dynamicAttributes", JSON.stringify(dynamicAttributesToSend));
 
       // Append quantity discounts
       if (productForm.quantityDiscounts && productForm.quantityDiscounts.length > 0) {
@@ -3906,21 +4031,38 @@ const AdminDashboard: React.FC = () => {
         const loadedAttributes = product.dynamicAttributes
           .filter((da: any) => da && da.attributeType) // Filter out null/undefined attributes
           .map((da: any) => {
-            const attributeType = typeof da.attributeType === 'object' && da.attributeType !== null 
-              ? da.attributeType 
-              : null;
+            // Handle both populated (object) and unpopulated (string ID) attributeType
+            let attributeTypeId = "";
+            if (typeof da.attributeType === 'object' && da.attributeType !== null) {
+              // Populated attributeType object
+              attributeTypeId = da.attributeType._id || da.attributeType.id || "";
+            } else if (typeof da.attributeType === 'string') {
+              // Unpopulated attributeType ID string
+              attributeTypeId = da.attributeType;
+            }
+            
             return {
-              attributeTypeId: attributeType ? attributeType._id : (da.attributeType || ""),
+              attributeTypeId: attributeTypeId,
               isEnabled: da.isEnabled !== undefined ? da.isEnabled : true,
               isRequired: da.isRequired !== undefined ? da.isRequired : false,
-              displayOrder: da.displayOrder || 0,
+              displayOrder: da.displayOrder !== undefined ? da.displayOrder : 0,
             };
           })
-          .filter((attr: any) => attr.attributeTypeId); // Filter out attributes without valid IDs
+          .filter((attr: any) => attr.attributeTypeId && attr.attributeTypeId.trim() !== ""); // Filter out attributes without valid IDs
+        
+        console.log("Loaded attributes for editing:", loadedAttributes);
         setSelectedAttributeTypes(loadedAttributes);
       } else {
+        console.log("No dynamic attributes found in product");
         setSelectedAttributeTypes([]);
       }
+
+      // Fetch attribute types filtered by product's category/subcategory
+      const productCategoryId = categoryId || null;
+      const productSubCategoryId = product.subcategory && typeof product.subcategory === "object" && product.subcategory._id 
+        ? product.subcategory._id 
+        : (product.subcategory && product.subcategory !== null && product.subcategory !== "null" && product.subcategory !== "" ? String(product.subcategory) : null);
+      await fetchAttributeTypes(productCategoryId, productSubCategoryId);
 
       // Build category path for hierarchical selection
       // If subcategory exists, build the path from root category to subcategory
@@ -4241,8 +4383,9 @@ const AdminDashboard: React.FC = () => {
         formData.append("category", categoryForm.parent); // parent becomes category in subcategory model
         // Add sort order
         formData.append("sortOrder", categoryForm.sortOrder.toString());
-        // Add slug - use provided slug or auto-generate from name
-        const slugToSend = categoryForm.slug || (categoryForm.name ? categoryForm.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : '');
+        // Add slug - use provided slug or auto-generate unique slug from name
+        const baseSlug = categoryForm.slug || (categoryForm.name ? categoryForm.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : '');
+        const slugToSend = baseSlug ? generateUniqueSlug(baseSlug, editingCategoryId, null) : '';
         if (slugToSend) {
           formData.append("slug", slugToSend.trim());
         }
@@ -4330,8 +4473,9 @@ const AdminDashboard: React.FC = () => {
         formData.append("parent", ""); // Explicitly set to empty for top-level
         // Add sort order
         formData.append("sortOrder", categoryForm.sortOrder.toString());
-        // Add slug - use provided slug or auto-generate from name
-        const slugToSend = categoryForm.slug || (categoryForm.name ? categoryForm.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : '');
+        // Add slug - use provided slug or auto-generate unique slug from name
+        const baseSlug = categoryForm.slug || (categoryForm.name ? categoryForm.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : '');
+        const slugToSend = baseSlug ? generateUniqueSlug(baseSlug, editingCategoryId, null) : '';
         if (slugToSend) {
           formData.append("slug", slugToSend.trim());
         }
@@ -4439,8 +4583,11 @@ const AdminDashboard: React.FC = () => {
       formData.append("description", subCategoryForm.description || "");
       formData.append("category", subCategoryForm.category);
       formData.append("sortOrder", subCategoryForm.sortOrder.toString());
-      if (subCategoryForm.slug) {
-        formData.append("slug", subCategoryForm.slug.trim());
+      // Add slug - use provided slug or auto-generate unique slug from name
+      const baseSlug = subCategoryForm.slug || (subCategoryForm.name ? subCategoryForm.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : '');
+      const slugToSend = baseSlug ? generateUniqueSlug(baseSlug, null, editingSubCategoryId) : '';
+      if (slugToSend) {
+        formData.append("slug", slugToSend.trim());
       }
       if (subCategoryForm.image) {
         formData.append("image", subCategoryForm.image);
@@ -5029,7 +5176,15 @@ const AdminDashboard: React.FC = () => {
               onSubmit={(e) => {
                 e.preventDefault();
                 handleProductSubmit(e);
-              }} 
+              }}
+              onClick={(e) => {
+                // Prevent form submission when clicking on buttons inside CKEditor
+                const target = e.target as HTMLElement;
+                if (target.closest('.ckeditor-container') || target.closest('[data-ckeditor-button]')) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}
               className="space-y-6"
             >
               {editingProductId && (
@@ -5142,25 +5297,16 @@ const AdminDashboard: React.FC = () => {
                         </div>
                       </div>
                     </label>
-                    <div 
-                      onClick={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onSubmit={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                      }}
-                    >
-                      <CKEditor
-                        value={productForm.description}
-                        onChange={(html) =>
-                          setProductForm({
-                            ...productForm,
-                            description: html,
-                          })
-                        }
-                        placeholder="Enter product description. Use the toolbar to format text, insert images, links, and more."
-                      />
-                    </div>
+                    <CKEditor
+                      value={productForm.description}
+                      onChange={(html) =>
+                        setProductForm({
+                          ...productForm,
+                          description: html,
+                        })
+                      }
+                      placeholder="Enter product description. Use the toolbar to format text, insert images, links, and more."
+                    />
                     <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                       <p className="text-xs font-medium text-blue-900 mb-1">💡 CKEditor Features:</p>
                       <ul className="text-xs text-blue-800 space-y-1 list-disc list-inside">
@@ -6950,7 +7096,12 @@ const AdminDashboard: React.FC = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => fetchAttributeTypes()}
+                      onClick={() => {
+                        // Fetch attributes filtered by selected category/subcategory
+                        const categoryId = productForm.category || (selectedCategoryPath.length > 0 ? selectedCategoryPath[0] : null);
+                        const subCategoryId = productForm.subcategory || (selectedCategoryPath.length > 1 ? selectedCategoryPath[selectedCategoryPath.length - 1] : null);
+                        fetchAttributeTypes(categoryId, subCategoryId);
+                      }}
                       disabled={loadingAttributeTypes}
                       className="px-3 py-1.5 text-sm bg-cream-900 text-white rounded-lg hover:bg-cream-800 transition-colors disabled:opacity-50 flex items-center gap-2"
                       title="Refresh attribute types list"
@@ -7080,19 +7231,33 @@ const AdminDashboard: React.FC = () => {
               {showCreateAttributeModal && (
                 <div 
                   data-modal="true"
-                  className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+                  className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4"
                   onClick={(e) => {
                     if (e.target === e.currentTarget) {
                       setShowCreateAttributeModal(false);
                     }
                   }}
+                  onMouseDown={(e) => {
+                    if (e.target === e.currentTarget) {
+                      e.stopPropagation();
+                    }
+                  }}
                 >
                   <div 
                     data-modal="true"
-                    className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto"
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onSubmit={(e) => e.stopPropagation()}
+                    className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                    }}
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                    }}
+                    onSubmit={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                    }}
                   >
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-xl font-bold text-cream-900">Create New Attribute Type</h3>
@@ -7104,11 +7269,16 @@ const AdminDashboard: React.FC = () => {
                           setAttributeTypeForm({
                             attributeName: "",
                             inputStyle: "DROPDOWN",
+                            attributeImage: null,
                             effectDescription: "",
                             simpleOptions: "",
                             isPriceEffect: false,
-                            isFixedQuantity: false,
+                            isStepQuantity: false,
+                            isRangeQuantity: false,
                             priceEffectAmount: "",
+                            stepQuantities: [],
+                            rangeQuantities: [],
+                            isFixedQuantity: false,
                             fixedQuantityMin: "",
                             fixedQuantityMax: "",
                             primaryEffectType: "INFORMATIONAL",
@@ -7186,6 +7356,7 @@ const AdminDashboard: React.FC = () => {
                               required
                             >
                               <option value="DROPDOWN">Dropdown Menu</option>
+                              <option value="POPUP">Pop-Up</option>
                               <option value="RADIO">Radio Buttons</option>
                               <option value="CHECKBOX">Checkbox</option>
                               <option value="TEXT_FIELD">Text Field</option>
@@ -7195,24 +7366,74 @@ const AdminDashboard: React.FC = () => {
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-cream-900 mb-2">
-                              What This Affects * <span className="text-xs text-cream-500 font-normal">(Description of impact on product)</span>
+                              Attribute Image <span className="text-xs text-cream-500 font-normal">(to be shown when selecting this attribute)</span>
                             </label>
-                            <textarea
-                              value={attributeTypeForm.effectDescription}
-                              onChange={(e) => setAttributeTypeForm({ ...attributeTypeForm, effectDescription: e.target.value })}
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/jpg,image/png,image/webp"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0] || null;
+                                if (file) {
+                                  // Validate file type
+                                  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+                                  if (!allowedTypes.includes(file.type)) {
+                                    setError("Invalid image format. Please upload JPG, PNG, or WebP image.");
+                                    e.target.value = '';
+                                    setAttributeTypeForm({ ...attributeTypeForm, attributeImage: null });
+                                    return;
+                                  }
+                                  // Validate file size (max 5MB)
+                                  const maxSize = 5 * 1024 * 1024;
+                                  if (file.size > maxSize) {
+                                    setError("Image size must be less than 5MB. Please compress the image and try again.");
+                                    e.target.value = '';
+                                    setAttributeTypeForm({ ...attributeTypeForm, attributeImage: null });
+                                    return;
+                                  }
+                                  setError(null);
+                                }
+                                setAttributeTypeForm({ ...attributeTypeForm, attributeImage: file });
+                              }}
                               className="w-full px-3 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-900 focus:border-transparent"
-                              rows={3}
-                              placeholder="e.g., Changes the product price, Requires customer to upload a file, Creates different product versions, Just displays information"
-                              required
                             />
-                            <p className="mt-1 text-xs text-cream-600">Describe how this attribute affects the product or customer experience</p>
+                            {attributeTypeForm.attributeImage && (
+                              <div className="mt-2">
+                                <img
+                                  src={URL.createObjectURL(attributeTypeForm.attributeImage)}
+                                  alt="Attribute preview"
+                                  className="w-32 h-32 object-cover rounded-lg border border-cream-300"
+                                />
+                                <p className="text-xs text-cream-600 mt-1">
+                                  {attributeTypeForm.attributeImage.name} ({(attributeTypeForm.attributeImage.size / 1024).toFixed(2)} KB)
+                                </p>
+                              </div>
+                            )}
                           </div>
+                        </div>
+                        <div className="mt-4">
+                          <label className="block text-sm font-medium text-cream-900 mb-2">
+                            What This Affects * <span className="text-xs text-cream-500 font-normal">(Description of impact on product)</span>
+                          </label>
+                          <textarea
+                            value={attributeTypeForm.effectDescription}
+                            onChange={(e) => setAttributeTypeForm({ ...attributeTypeForm, effectDescription: e.target.value })}
+                            className="w-full px-3 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-900 focus:border-transparent"
+                            rows={3}
+                            placeholder="e.g., Changes the product price, Requires customer to upload a file, Creates different product versions, Just displays information"
+                            required
+                          />
+                          <p className="mt-1 text-xs text-cream-600">Describe how this attribute affects the product or customer experience</p>
                         </div>
                       </div>
 
                       {/* Options Table - Show when DROPDOWN/RADIO or when Is Price Effect is checked */}
                       {((attributeTypeForm.inputStyle === "DROPDOWN" || attributeTypeForm.inputStyle === "RADIO") || attributeTypeForm.isPriceEffect) ? (
-                        <div className="border-b border-cream-200 pb-4">
+                        <div className="border-b border-cream-200 pb-4" data-attribute-options-table>
+                          {attributeFormErrors.attributeValues && (
+                            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                              <p className="text-sm text-red-800 font-medium">{attributeFormErrors.attributeValues}</p>
+                            </div>
+                          )}
                           <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-semibold text-cream-900">Options</h3>
                             <button
@@ -7308,24 +7529,29 @@ const AdminDashboard: React.FC = () => {
                                                   return;
                                                 }
                                                 
-                                                // Upload to Cloudinary
+                                                // Upload to backend API (which uploads to Cloudinary)
                                                 try {
                                                   setLoading(true);
                                                   const formData = new FormData();
-                                                  formData.append('file', file);
-                                                  formData.append('upload_preset', 'print24_uploads');
+                                                  formData.append('image', file);
                                                   
-                                                  const uploadResponse = await fetch('https://api.cloudinary.com/v1_1/dhqpbfljb/image/upload', {
+                                                  const uploadResponse = await fetch(`${API_BASE_URL}/upload-image`, {
                                                     method: 'POST',
+                                                    headers: getAuthHeaders(),
                                                     body: formData,
                                                   });
                                                   
                                                   if (!uploadResponse.ok) {
-                                                    throw new Error('Failed to upload image');
+                                                    const errorData = await uploadResponse.json().catch(() => ({}));
+                                                    throw new Error(errorData.error || 'Failed to upload image');
                                                   }
                                                   
                                                   const uploadData = await uploadResponse.json();
-                                                  const imageUrl = uploadData.secure_url;
+                                                  const imageUrl = uploadData.url || uploadData.secure_url;
+                                                  
+                                                  if (!imageUrl) {
+                                                    throw new Error('No image URL returned from server');
+                                                  }
                                                   
                                                   const updated = [...attributeTypeForm.attributeOptionsTable];
                                                   updated[index].image = imageUrl;
@@ -7333,7 +7559,7 @@ const AdminDashboard: React.FC = () => {
                                                   setError(null);
                                                 } catch (err) {
                                                   console.error("Error uploading image:", err);
-                                                  setError("Failed to upload image. Please try again.");
+                                                  setError(err instanceof Error ? err.message : "Failed to upload image. Please try again.");
                                                 } finally {
                                                   setLoading(false);
                                                 }
@@ -7429,58 +7655,187 @@ const AdminDashboard: React.FC = () => {
                             </div>
                           </div>
 
-                          {/* Is Fixed Quantity Checkbox */}
+                          {/* Is Step Quantity Checkbox */}
                           <div className="flex items-start gap-3 p-4 bg-cream-50 rounded-lg border border-cream-200">
                             <input
                               type="checkbox"
-                              checked={attributeTypeForm.isFixedQuantity}
-                              onChange={(e) => setAttributeTypeForm({ ...attributeTypeForm, isFixedQuantity: e.target.checked })}
+                              checked={attributeTypeForm.isStepQuantity}
+                              onChange={(e) => setAttributeTypeForm({ ...attributeTypeForm, isStepQuantity: e.target.checked })}
                               className="w-5 h-5 text-cream-900 border-cream-300 rounded focus:ring-cream-900 mt-1"
                             />
                             <div className="flex-1">
                               <label className="text-sm font-medium text-cream-900 cursor-pointer">
-                                Is Fixed Quantity?
+                                Is Step Quantity?
                               </label>
                               <p className="text-xs text-cream-600 mt-1">
-                                Check this if this attribute restricts quantity to specific values (e.g., 1000, 2000, 3000 only)
+                                Check this if this attribute restricts quantity to specific steps (e.g., 1000, 2000, 3000 only)
                               </p>
-                              {attributeTypeForm.isFixedQuantity && (
-                                <div className="mt-3 grid grid-cols-2 gap-4">
-                                  <div>
-                                    <label className="block text-sm font-medium text-cream-900 mb-2">
-                                      Minimum Quantity *
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={attributeTypeForm.fixedQuantityMin}
-                                      onChange={(e) => setAttributeTypeForm({ ...attributeTypeForm, fixedQuantityMin: e.target.value })}
-                                      className="w-full px-3 py-2 border border-cream-300 rounded-lg"
-                                      placeholder="e.g., 1000"
-                                      step="100"
-                                      min="0"
-                                      required={attributeTypeForm.isFixedQuantity}
-                                    />
+                              {attributeTypeForm.isStepQuantity && (
+                                <div className="mt-3 space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-medium text-cream-900">Steps:</h4>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setAttributeTypeForm({
+                                          ...attributeTypeForm,
+                                          stepQuantities: [...attributeTypeForm.stepQuantities, { quantity: "", price: "" }],
+                                        });
+                                      }}
+                                      className="px-3 py-1 text-xs bg-cream-900 text-white rounded-lg hover:bg-cream-800 transition-colors flex items-center gap-1"
+                                    >
+                                      <Plus size={14} />
+                                      Add Step
+                                    </button>
                                   </div>
-                                  <div>
-                                    <label className="block text-sm font-medium text-cream-900 mb-2">
-                                      Maximum Quantity *
-                                    </label>
-                                    <input
-                                      type="number"
-                                      value={attributeTypeForm.fixedQuantityMax}
-                                      onChange={(e) => setAttributeTypeForm({ ...attributeTypeForm, fixedQuantityMax: e.target.value })}
-                                      className="w-full px-3 py-2 border border-cream-300 rounded-lg"
-                                      placeholder="e.g., 72000"
-                                      step="100"
-                                      min="0"
-                                      required={attributeTypeForm.isFixedQuantity}
-                                    />
+                                  {attributeTypeForm.stepQuantities.length === 0 ? (
+                                    <p className="text-xs text-cream-600">No steps added. Click "Add Step" to start.</p>
+                                  ) : (
+                                    <div className="space-y-2">
+                                      {attributeTypeForm.stepQuantities.map((step, index) => (
+                                        <div key={index} className="flex items-center gap-2 p-2 bg-white border border-cream-200 rounded-lg">
+                                          <span className="text-sm text-cream-700 whitespace-nowrap">Step - {index + 1}:</span>
+                                          <input
+                                            type="number"
+                                            value={step.quantity}
+                                            onChange={(e) => {
+                                              const updated = [...attributeTypeForm.stepQuantities];
+                                              updated[index].quantity = e.target.value;
+                                              setAttributeTypeForm({ ...attributeTypeForm, stepQuantities: updated });
+                                            }}
+                                            className="flex-1 px-2 py-1 border border-cream-300 rounded text-sm"
+                                            placeholder="quantity of step"
+                                            min="0"
+                                            step="100"
+                                          />
+                                          <span className="text-sm text-cream-700 whitespace-nowrap">Price:</span>
+                                          <input
+                                            type="number"
+                                            value={step.price}
+                                            onChange={(e) => {
+                                              const updated = [...attributeTypeForm.stepQuantities];
+                                              updated[index].price = e.target.value;
+                                              setAttributeTypeForm({ ...attributeTypeForm, stepQuantities: updated });
+                                            }}
+                                            className="flex-1 px-2 py-1 border border-cream-300 rounded text-sm"
+                                            placeholder="price of step"
+                                            min="0"
+                                            step="0.01"
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const updated = attributeTypeForm.stepQuantities.filter((_, i) => i !== index);
+                                              setAttributeTypeForm({ ...attributeTypeForm, stepQuantities: updated });
+                                            }}
+                                            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                          >
+                                            <Trash2 size={16} />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Is Range Quantity Checkbox */}
+                          <div className="flex items-start gap-3 p-4 bg-cream-50 rounded-lg border border-cream-200">
+                            <input
+                              type="checkbox"
+                              checked={attributeTypeForm.isRangeQuantity}
+                              onChange={(e) => setAttributeTypeForm({ ...attributeTypeForm, isRangeQuantity: e.target.checked })}
+                              className="w-5 h-5 text-cream-900 border-cream-300 rounded focus:ring-cream-900 mt-1"
+                            />
+                            <div className="flex-1">
+                              <label className="text-sm font-medium text-cream-900 cursor-pointer">
+                                Is Range Quantity?
+                              </label>
+                              <p className="text-xs text-cream-600 mt-1">
+                                Check this if this attribute restricts quantity to specific Range (e.g., 1000-2000, 2000-5000)
+                              </p>
+                              {attributeTypeForm.isRangeQuantity && (
+                                <div className="mt-3 space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-medium text-cream-900">Ranges:</h4>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setAttributeTypeForm({
+                                          ...attributeTypeForm,
+                                          rangeQuantities: [...attributeTypeForm.rangeQuantities, { min: "", max: "", price: "" }],
+                                        });
+                                      }}
+                                      className="px-3 py-1 text-xs bg-cream-900 text-white rounded-lg hover:bg-cream-800 transition-colors flex items-center gap-1"
+                                    >
+                                      <Plus size={14} />
+                                      Add Range
+                                    </button>
                                   </div>
-                                  <div className="col-span-2">
-                                    <p className="text-xs text-cream-600">
-                                      Customers will only be able to select quantities between {attributeTypeForm.fixedQuantityMin || "min"} and {attributeTypeForm.fixedQuantityMax || "max"}.
-                                    </p>
-                                  </div>
+                                  {attributeTypeForm.rangeQuantities.length === 0 ? (
+                                    <p className="text-xs text-cream-600">No ranges added. Click "Add Range" to start.</p>
+                                  ) : (
+                                    <div className="space-y-2">
+                                      {attributeTypeForm.rangeQuantities.map((range, index) => (
+                                        <div key={index} className="flex items-center gap-2 p-2 bg-white border border-cream-200 rounded-lg">
+                                          <span className="text-sm text-cream-700 whitespace-nowrap">Range - {index + 1}:</span>
+                                          <input
+                                            type="number"
+                                            value={range.min}
+                                            onChange={(e) => {
+                                              const updated = [...attributeTypeForm.rangeQuantities];
+                                              updated[index].min = e.target.value;
+                                              setAttributeTypeForm({ ...attributeTypeForm, rangeQuantities: updated });
+                                            }}
+                                            className="flex-1 px-2 py-1 border border-cream-300 rounded text-sm"
+                                            placeholder="min quantity"
+                                            min="0"
+                                            step="100"
+                                          />
+                                          <span className="text-sm text-cream-700">-</span>
+                                          <input
+                                            type="number"
+                                            value={range.max}
+                                            onChange={(e) => {
+                                              const updated = [...attributeTypeForm.rangeQuantities];
+                                              updated[index].max = e.target.value;
+                                              setAttributeTypeForm({ ...attributeTypeForm, rangeQuantities: updated });
+                                            }}
+                                            className="flex-1 px-2 py-1 border border-cream-300 rounded text-sm"
+                                            placeholder="max quantity"
+                                            min="0"
+                                            step="100"
+                                          />
+                                          <span className="text-sm text-cream-700 whitespace-nowrap">Price:</span>
+                                          <input
+                                            type="number"
+                                            value={range.price}
+                                            onChange={(e) => {
+                                              const updated = [...attributeTypeForm.rangeQuantities];
+                                              updated[index].price = e.target.value;
+                                              setAttributeTypeForm({ ...attributeTypeForm, rangeQuantities: updated });
+                                            }}
+                                            className="flex-1 px-2 py-1 border border-cream-300 rounded text-sm"
+                                            placeholder="price of range"
+                                            min="0"
+                                            step="0.01"
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const updated = attributeTypeForm.rangeQuantities.filter((_, i) => i !== index);
+                                              setAttributeTypeForm({ ...attributeTypeForm, rangeQuantities: updated });
+                                            }}
+                                            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                          >
+                                            <Trash2 size={16} />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -7585,11 +7940,16 @@ const AdminDashboard: React.FC = () => {
                             setAttributeTypeForm({
                               attributeName: "",
                               inputStyle: "DROPDOWN",
+                              attributeImage: null,
                               effectDescription: "",
                               simpleOptions: "",
                               isPriceEffect: false,
-                              isFixedQuantity: false,
+                              isStepQuantity: false,
+                              isRangeQuantity: false,
                               priceEffectAmount: "",
+                              stepQuantities: [],
+                              rangeQuantities: [],
+                              isFixedQuantity: false,
                               fixedQuantityMin: "",
                               fixedQuantityMax: "",
                               primaryEffectType: "INFORMATIONAL",
@@ -7746,8 +8106,17 @@ const AdminDashboard: React.FC = () => {
                     // Auto-generate slug if it hasn't been manually edited
                     let newSlug = categoryForm.slug;
                     if (!isSlugManuallyEdited) {
-                      // Auto-generate slug from the new name
-                      newSlug = newName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                      // Generate base slug from the new name
+                      const baseSlug = newName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                      
+                      // Only check for uniqueness and add numbers if name doesn't end with space
+                      // This prevents adding numbers while user is still typing
+                      if (baseSlug && !newName.endsWith(' ')) {
+                        newSlug = generateUniqueSlug(baseSlug, editingCategoryId, null);
+                      } else {
+                        // Just use base slug without uniqueness check if name ends with space
+                        newSlug = baseSlug;
+                      }
                     }
                     setCategoryForm({ ...categoryForm, name: newName, slug: newSlug });
                     setError(null); // Clear error when user starts typing
@@ -7755,6 +8124,16 @@ const AdminDashboard: React.FC = () => {
                   onBlur={() => {
                     if (!categoryForm.name.trim()) {
                       setError("Category name is required.");
+                    } else if (!isSlugManuallyEdited) {
+                      // Generate unique slug when user finishes typing (on blur)
+                      const trimmedName = categoryForm.name.trim();
+                      if (trimmedName) {
+                        const baseSlug = trimmedName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                        if (baseSlug) {
+                          const uniqueSlug = generateUniqueSlug(baseSlug, editingCategoryId, null);
+                          setCategoryForm({ ...categoryForm, slug: uniqueSlug });
+                        }
+                      }
                     }
                   }}
                   className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500 ${
@@ -8011,8 +8390,17 @@ const AdminDashboard: React.FC = () => {
                     // Auto-generate slug if it hasn't been manually edited
                     let newSlug = subCategoryForm.slug;
                     if (!isSubCategorySlugManuallyEdited) {
-                      // Auto-generate slug from the new name
-                      newSlug = newName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                      // Generate base slug from the new name
+                      const baseSlug = newName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                      
+                      // Only check for uniqueness and add numbers if name doesn't end with space
+                      // This prevents adding numbers while user is still typing
+                      if (baseSlug && !newName.endsWith(' ')) {
+                        newSlug = generateUniqueSlug(baseSlug, null, editingSubCategoryId);
+                      } else {
+                        // Just use base slug without uniqueness check if name ends with space
+                        newSlug = baseSlug;
+                      }
                     }
                     setSubCategoryForm({ ...subCategoryForm, name: newName, slug: newSlug });
                     setError(null);
@@ -8024,6 +8412,21 @@ const AdminDashboard: React.FC = () => {
                     subCategoryFormErrors.name ? 'border-red-300 bg-red-50' : 'border-cream-300'
                   }`}
                   placeholder="Enter subcategory name"
+                  onBlur={() => {
+                    if (!subCategoryForm.name.trim()) {
+                      setSubCategoryFormErrors({ ...subCategoryFormErrors, name: "Subcategory name is required" });
+                    } else if (!isSubCategorySlugManuallyEdited) {
+                      // Generate unique slug when user finishes typing (on blur)
+                      const trimmedName = subCategoryForm.name.trim();
+                      if (trimmedName) {
+                        const baseSlug = trimmedName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                        if (baseSlug) {
+                          const uniqueSlug = generateUniqueSlug(baseSlug, null, editingSubCategoryId);
+                          setSubCategoryForm({ ...subCategoryForm, slug: uniqueSlug });
+                        }
+                      }
+                    }
+                  }}
                 />
                 {subCategoryFormErrors.name && (
                   <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
@@ -9584,6 +9987,7 @@ const AdminDashboard: React.FC = () => {
                           required
                         >
                           <option value="DROPDOWN">Dropdown Menu</option>
+                          <option value="POPUP">Pop-Up</option>
                           <option value="RADIO">Radio Buttons</option>
                           <option value="CHECKBOX">Checkbox</option>
                           <option value="TEXT_FIELD">Text Field</option>
@@ -9593,18 +9997,63 @@ const AdminDashboard: React.FC = () => {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-cream-900 mb-2">
-                          What This Affects * <span className="text-xs text-cream-500 font-normal">(Description of impact on product)</span>
+                          Attribute Image <span className="text-xs text-cream-500 font-normal">(to be shown when selecting this attribute)</span>
                         </label>
-                        <textarea
-                          value={attributeTypeForm.effectDescription}
-                          onChange={(e) => setAttributeTypeForm({ ...attributeTypeForm, effectDescription: e.target.value })}
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/jpg,image/png,image/webp"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0] || null;
+                            if (file) {
+                              // Validate file type
+                              const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+                              if (!allowedTypes.includes(file.type)) {
+                                setError("Invalid image format. Please upload JPG, PNG, or WebP image.");
+                                e.target.value = '';
+                                setAttributeTypeForm({ ...attributeTypeForm, attributeImage: null });
+                                return;
+                              }
+                              // Validate file size (max 5MB)
+                              const maxSize = 5 * 1024 * 1024;
+                              if (file.size > maxSize) {
+                                setError("Image size must be less than 5MB. Please compress the image and try again.");
+                                e.target.value = '';
+                                setAttributeTypeForm({ ...attributeTypeForm, attributeImage: null });
+                                return;
+                              }
+                              setError(null);
+                            }
+                            setAttributeTypeForm({ ...attributeTypeForm, attributeImage: file });
+                          }}
                           className="w-full px-3 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-900 focus:border-transparent"
-                          rows={3}
-                          placeholder="e.g., Changes the product price, Requires customer to upload a file, Creates different product versions, Just displays information"
-                          required
                         />
-                        <p className="mt-1 text-xs text-cream-600">Describe how this attribute affects the product or customer experience</p>
+                        {attributeTypeForm.attributeImage && (
+                          <div className="mt-2">
+                            <img
+                              src={URL.createObjectURL(attributeTypeForm.attributeImage)}
+                              alt="Attribute preview"
+                              className="w-32 h-32 object-cover rounded-lg border border-cream-300"
+                            />
+                            <p className="text-xs text-cream-600 mt-1">
+                              {attributeTypeForm.attributeImage.name} ({(attributeTypeForm.attributeImage.size / 1024).toFixed(2)} KB)
+                            </p>
+                          </div>
+                        )}
                       </div>
+                    </div>
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-cream-900 mb-2">
+                        What This Affects * <span className="text-xs text-cream-500 font-normal">(Description of impact on product)</span>
+                      </label>
+                      <textarea
+                        value={attributeTypeForm.effectDescription}
+                        onChange={(e) => setAttributeTypeForm({ ...attributeTypeForm, effectDescription: e.target.value })}
+                        className="w-full px-3 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-900 focus:border-transparent"
+                        rows={3}
+                        placeholder="e.g., Changes the product price, Requires customer to upload a file, Creates different product versions, Just displays information"
+                        required
+                      />
+                      <p className="mt-1 text-xs text-cream-600">Describe how this attribute affects the product or customer experience</p>
                     </div>
                   </div>
 
@@ -9706,24 +10155,29 @@ const AdminDashboard: React.FC = () => {
                                               return;
                                             }
                                             
-                                            // Upload to Cloudinary
+                                            // Upload to backend API (which uploads to Cloudinary)
                                             try {
                                               setLoading(true);
                                               const formData = new FormData();
-                                              formData.append('file', file);
-                                              formData.append('upload_preset', 'print24_uploads');
+                                              formData.append('image', file);
                                               
-                                              const uploadResponse = await fetch('https://api.cloudinary.com/v1_1/dhqpbfljb/image/upload', {
+                                              const uploadResponse = await fetch(`${API_BASE_URL}/upload-image`, {
                                                 method: 'POST',
+                                                headers: getAuthHeaders(),
                                                 body: formData,
                                               });
                                               
                                               if (!uploadResponse.ok) {
-                                                throw new Error('Failed to upload image');
+                                                const errorData = await uploadResponse.json().catch(() => ({}));
+                                                throw new Error(errorData.error || 'Failed to upload image');
                                               }
                                               
                                               const uploadData = await uploadResponse.json();
-                                              const imageUrl = uploadData.secure_url;
+                                              const imageUrl = uploadData.url || uploadData.secure_url;
+                                              
+                                              if (!imageUrl) {
+                                                throw new Error('No image URL returned from server');
+                                              }
                                               
                                               const updated = [...attributeTypeForm.attributeOptionsTable];
                                               updated[index].image = imageUrl;
@@ -9731,7 +10185,7 @@ const AdminDashboard: React.FC = () => {
                                               setError(null);
                                             } catch (err) {
                                               console.error("Error uploading image:", err);
-                                              setError("Failed to upload image. Please try again.");
+                                              setError(err instanceof Error ? err.message : "Failed to upload image. Please try again.");
                                             } finally {
                                               setLoading(false);
                                             }
@@ -9827,58 +10281,187 @@ const AdminDashboard: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Is Fixed Quantity Checkbox */}
+                      {/* Is Step Quantity Checkbox */}
                       <div className="flex items-start gap-3 p-4 bg-cream-50 rounded-lg border border-cream-200">
                         <input
                           type="checkbox"
-                          checked={attributeTypeForm.isFixedQuantity}
-                          onChange={(e) => setAttributeTypeForm({ ...attributeTypeForm, isFixedQuantity: e.target.checked })}
+                          checked={attributeTypeForm.isStepQuantity}
+                          onChange={(e) => setAttributeTypeForm({ ...attributeTypeForm, isStepQuantity: e.target.checked })}
                           className="w-5 h-5 text-cream-900 border-cream-300 rounded focus:ring-cream-900 mt-1"
                         />
                         <div className="flex-1">
                           <label className="text-sm font-medium text-cream-900 cursor-pointer">
-                            Is Fixed Quantity?
+                            Is Step Quantity?
                           </label>
                           <p className="text-xs text-cream-600 mt-1">
-                            Check this if this attribute restricts quantity to specific values (e.g., 1000, 2000, 3000 only)
+                            Check this if this attribute restricts quantity to specific steps (e.g., 1000, 2000, 3000 only)
                           </p>
-                          {attributeTypeForm.isFixedQuantity && (
-                            <div className="mt-3 grid grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-sm font-medium text-cream-900 mb-2">
-                                  Minimum Quantity *
-                                </label>
-                                <input
-                                  type="number"
-                                  value={attributeTypeForm.fixedQuantityMin}
-                                  onChange={(e) => setAttributeTypeForm({ ...attributeTypeForm, fixedQuantityMin: e.target.value })}
-                                  className="w-full px-3 py-2 border border-cream-300 rounded-lg"
-                                  placeholder="e.g., 1000"
-                                  step="100"
-                                  min="0"
-                                  required={attributeTypeForm.isFixedQuantity}
-                                />
+                          {attributeTypeForm.isStepQuantity && (
+                            <div className="mt-3 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-medium text-cream-900">Steps:</h4>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setAttributeTypeForm({
+                                      ...attributeTypeForm,
+                                      stepQuantities: [...attributeTypeForm.stepQuantities, { quantity: "", price: "" }],
+                                    });
+                                  }}
+                                  className="px-3 py-1 text-xs bg-cream-900 text-white rounded-lg hover:bg-cream-800 transition-colors flex items-center gap-1"
+                                >
+                                  <Plus size={14} />
+                                  Add Step
+                                </button>
                               </div>
-                              <div>
-                                <label className="block text-sm font-medium text-cream-900 mb-2">
-                                  Maximum Quantity *
-                                </label>
-                                <input
-                                  type="number"
-                                  value={attributeTypeForm.fixedQuantityMax}
-                                  onChange={(e) => setAttributeTypeForm({ ...attributeTypeForm, fixedQuantityMax: e.target.value })}
-                                  className="w-full px-3 py-2 border border-cream-300 rounded-lg"
-                                  placeholder="e.g., 72000"
-                                  step="100"
-                                  min="0"
-                                  required={attributeTypeForm.isFixedQuantity}
-                                />
+                              {attributeTypeForm.stepQuantities.length === 0 ? (
+                                <p className="text-xs text-cream-600">No steps added. Click "Add Step" to start.</p>
+                              ) : (
+                                <div className="space-y-2">
+                                  {attributeTypeForm.stepQuantities.map((step, index) => (
+                                    <div key={index} className="flex items-center gap-2 p-2 bg-white border border-cream-200 rounded-lg">
+                                      <span className="text-sm text-cream-700 whitespace-nowrap">Step - {index + 1}:</span>
+                                      <input
+                                        type="number"
+                                        value={step.quantity}
+                                        onChange={(e) => {
+                                          const updated = [...attributeTypeForm.stepQuantities];
+                                          updated[index].quantity = e.target.value;
+                                          setAttributeTypeForm({ ...attributeTypeForm, stepQuantities: updated });
+                                        }}
+                                        className="flex-1 px-2 py-1 border border-cream-300 rounded text-sm"
+                                        placeholder="quantity of step"
+                                        min="0"
+                                        step="100"
+                                      />
+                                      <span className="text-sm text-cream-700 whitespace-nowrap">Price:</span>
+                                      <input
+                                        type="number"
+                                        value={step.price}
+                                        onChange={(e) => {
+                                          const updated = [...attributeTypeForm.stepQuantities];
+                                          updated[index].price = e.target.value;
+                                          setAttributeTypeForm({ ...attributeTypeForm, stepQuantities: updated });
+                                        }}
+                                        className="flex-1 px-2 py-1 border border-cream-300 rounded text-sm"
+                                        placeholder="price of step"
+                                        min="0"
+                                        step="0.01"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const updated = attributeTypeForm.stepQuantities.filter((_, i) => i !== index);
+                                          setAttributeTypeForm({ ...attributeTypeForm, stepQuantities: updated });
+                                        }}
+                                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Is Range Quantity Checkbox */}
+                      <div className="flex items-start gap-3 p-4 bg-cream-50 rounded-lg border border-cream-200">
+                        <input
+                          type="checkbox"
+                          checked={attributeTypeForm.isRangeQuantity}
+                          onChange={(e) => setAttributeTypeForm({ ...attributeTypeForm, isRangeQuantity: e.target.checked })}
+                          className="w-5 h-5 text-cream-900 border-cream-300 rounded focus:ring-cream-900 mt-1"
+                        />
+                        <div className="flex-1">
+                          <label className="text-sm font-medium text-cream-900 cursor-pointer">
+                            Is Range Quantity?
+                          </label>
+                          <p className="text-xs text-cream-600 mt-1">
+                            Check this if this attribute restricts quantity to specific Range (e.g., 1000-2000, 2000-5000)
+                          </p>
+                          {attributeTypeForm.isRangeQuantity && (
+                            <div className="mt-3 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-medium text-cream-900">Ranges:</h4>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setAttributeTypeForm({
+                                      ...attributeTypeForm,
+                                      rangeQuantities: [...attributeTypeForm.rangeQuantities, { min: "", max: "", price: "" }],
+                                    });
+                                  }}
+                                  className="px-3 py-1 text-xs bg-cream-900 text-white rounded-lg hover:bg-cream-800 transition-colors flex items-center gap-1"
+                                >
+                                  <Plus size={14} />
+                                  Add Range
+                                </button>
                               </div>
-                              <div className="col-span-2">
-                                <p className="text-xs text-cream-600">
-                                  Customers will only be able to select quantities between {attributeTypeForm.fixedQuantityMin || "min"} and {attributeTypeForm.fixedQuantityMax || "max"}.
-                                </p>
-                              </div>
+                              {attributeTypeForm.rangeQuantities.length === 0 ? (
+                                <p className="text-xs text-cream-600">No ranges added. Click "Add Range" to start.</p>
+                              ) : (
+                                <div className="space-y-2">
+                                  {attributeTypeForm.rangeQuantities.map((range, index) => (
+                                    <div key={index} className="flex items-center gap-2 p-2 bg-white border border-cream-200 rounded-lg">
+                                      <span className="text-sm text-cream-700 whitespace-nowrap">Range - {index + 1}:</span>
+                                      <input
+                                        type="number"
+                                        value={range.min}
+                                        onChange={(e) => {
+                                          const updated = [...attributeTypeForm.rangeQuantities];
+                                          updated[index].min = e.target.value;
+                                          setAttributeTypeForm({ ...attributeTypeForm, rangeQuantities: updated });
+                                        }}
+                                        className="flex-1 px-2 py-1 border border-cream-300 rounded text-sm"
+                                        placeholder="min quantity"
+                                        min="0"
+                                        step="100"
+                                      />
+                                      <span className="text-sm text-cream-700">-</span>
+                                      <input
+                                        type="number"
+                                        value={range.max}
+                                        onChange={(e) => {
+                                          const updated = [...attributeTypeForm.rangeQuantities];
+                                          updated[index].max = e.target.value;
+                                          setAttributeTypeForm({ ...attributeTypeForm, rangeQuantities: updated });
+                                        }}
+                                        className="flex-1 px-2 py-1 border border-cream-300 rounded text-sm"
+                                        placeholder="max quantity"
+                                        min="0"
+                                        step="100"
+                                      />
+                                      <span className="text-sm text-cream-700 whitespace-nowrap">Price:</span>
+                                      <input
+                                        type="number"
+                                        value={range.price}
+                                        onChange={(e) => {
+                                          const updated = [...attributeTypeForm.rangeQuantities];
+                                          updated[index].price = e.target.value;
+                                          setAttributeTypeForm({ ...attributeTypeForm, rangeQuantities: updated });
+                                        }}
+                                        className="flex-1 px-2 py-1 border border-cream-300 rounded text-sm"
+                                        placeholder="price of range"
+                                        min="0"
+                                        step="0.01"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const updated = attributeTypeForm.rangeQuantities.filter((_, i) => i !== index);
+                                          setAttributeTypeForm({ ...attributeTypeForm, rangeQuantities: updated });
+                                        }}
+                                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

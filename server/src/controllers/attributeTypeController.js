@@ -43,8 +43,34 @@ export const createAttributeType = async (req, res) => {
         parsedAttributeValues = typeof attributeValues === 'string' 
           ? JSON.parse(attributeValues) 
           : attributeValues;
+        
+        // Validate attributeValues is an array
+        if (!Array.isArray(parsedAttributeValues)) {
+          return res.status(400).json({ error: "attributeValues must be an array" });
+        }
+        
+        // Validate attributeValues structure
+        for (const av of parsedAttributeValues) {
+          if (!av.value || !av.label) {
+            return res.status(400).json({ error: "Each attribute value must have 'value' and 'label' fields" });
+          }
+        }
+        
+        // For DROPDOWN, RADIO, POPUP input styles, require at least 2 options
+        if (['DROPDOWN', 'RADIO', 'POPUP'].includes(inputStyle) && parsedAttributeValues.length < 2) {
+          return res.status(400).json({ 
+            error: `${inputStyle} input style requires at least 2 attribute values. Please add more options.` 
+          });
+        }
       } catch (err) {
         return res.status(400).json({ error: "Invalid JSON in attributeValues" });
+      }
+    } else {
+      // For DROPDOWN, RADIO, POPUP input styles, attributeValues is required
+      if (['DROPDOWN', 'RADIO', 'POPUP'].includes(inputStyle)) {
+        return res.status(400).json({ 
+          error: `${inputStyle} input style requires attribute values. Please add at least 2 options.` 
+        });
       }
     }
 
@@ -231,6 +257,28 @@ export const updateAttributeType = async (req, res) => {
         parsedAttributeValues = typeof attributeValues === 'string'
           ? JSON.parse(attributeValues)
           : attributeValues;
+        
+        // Validate attributeValues is an array
+        if (!Array.isArray(parsedAttributeValues)) {
+          return res.status(400).json({ error: "attributeValues must be an array" });
+        }
+        
+        // Validate attributeValues structure
+        for (const av of parsedAttributeValues) {
+          if (!av.value || !av.label) {
+            return res.status(400).json({ error: "Each attribute value must have 'value' and 'label' fields" });
+          }
+        }
+        
+        // Get the inputStyle to validate (use updated value if provided, otherwise existing)
+        const currentInputStyle = inputStyle !== undefined ? inputStyle : attributeType.inputStyle;
+        
+        // For DROPDOWN, RADIO, POPUP input styles, require at least 2 options
+        if (['DROPDOWN', 'RADIO', 'POPUP'].includes(currentInputStyle) && parsedAttributeValues.length < 2) {
+          return res.status(400).json({ 
+            error: `${currentInputStyle} input style requires at least 2 attribute values. Please add more options.` 
+          });
+        }
       } catch (err) {
         return res.status(400).json({ error: "Invalid JSON in attributeValues" });
       }

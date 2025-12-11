@@ -5,6 +5,32 @@ import Sequence from "../models/sequenceModal.js";
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
 
+// Helper function to generate a unique slug by appending increment numbers
+const generateUniqueSlug = async (baseSlug, excludeId = null) => {
+  let uniqueSlug = baseSlug;
+  let counter = 1;
+  
+  // Check if slug exists (excluding current category if updating)
+  let existingCategory = await Category.findOne({ slug: uniqueSlug });
+  if (excludeId && existingCategory && existingCategory._id.toString() === excludeId) {
+    // If it's the same category being updated, the slug is already unique
+    return uniqueSlug;
+  }
+  
+  // Keep incrementing until we find a unique slug
+  while (existingCategory) {
+    uniqueSlug = `${baseSlug}-${counter}`;
+    existingCategory = await Category.findOne({ slug: uniqueSlug });
+    if (excludeId && existingCategory && existingCategory._id.toString() === excludeId) {
+      // If it's the same category being updated, the slug is already unique
+      break;
+    }
+    counter++;
+  }
+  
+  return uniqueSlug;
+};
+
 export const createCategory = async (req, res) => {
   try {
     const { name, description, type, parent, slug, sortOrder } = req.body;
@@ -72,7 +98,15 @@ export const createCategory = async (req, res) => {
     imageUrl = result.secure_url;
 
     // Generate slug from name if not provided
-    let categorySlug = slug || name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    let categorySlug;
+    if (slug) {
+      // Slug was manually provided - use it as-is (will show error if duplicate)
+      categorySlug = slug;
+    } else {
+      // Slug was auto-generated - make it unique by appending numbers if needed
+      const baseSlug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      categorySlug = await generateUniqueSlug(baseSlug);
+    }
 
     // Parse sortOrder (default to 0 if not provided or invalid)
     const parsedSortOrder = sortOrder !== undefined && sortOrder !== null && sortOrder !== '' 
@@ -358,9 +392,23 @@ export const updateCategory = async (req, res) => {
     }
 
     // Generate slug from name if not provided and name changed
-    let categorySlug = slug;
-    if (!categorySlug && name) {
-      categorySlug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    let categorySlug;
+    if (slug) {
+      // Slug was manually provided
+      // If it's the same as current slug, no need to update
+      if (slug === category.slug) {
+        categorySlug = category.slug; // Keep existing, no update needed
+      } else {
+        // Different slug - use it as-is (MongoDB will show error if duplicate)
+        categorySlug = slug;
+      }
+    } else if (name) {
+      // Slug was auto-generated - make it unique by appending numbers if needed
+      const baseSlug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      categorySlug = await generateUniqueSlug(baseSlug, categoryId);
+    } else {
+      // Keep existing slug if name didn't change
+      categorySlug = category.slug;
     }
 
     const updateData = {
@@ -383,7 +431,8 @@ export const updateCategory = async (req, res) => {
       updateData.parent = parent || null;
     }
 
-    if (categorySlug) {
+    // Only update slug if it's different from the current one
+    if (categorySlug && categorySlug !== category.slug) {
       updateData.slug = categorySlug;
     }
 

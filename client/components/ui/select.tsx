@@ -61,7 +61,10 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
         {isOpen && (
           <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-cream-200 bg-white shadow-lg">
             <div className="max-h-60 overflow-auto p-1">
-              {options.map((option) => (
+              {options.length === 0 ? (
+                <div className="px-2 py-1.5 text-sm text-cream-500">No options available</div>
+              ) : (
+                options.map((option) => (
                 <button
                   key={option.value}
                   type="button"
@@ -83,7 +86,8 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                     </span>
                   )}
                 </button>
-              ))}
+              ))
+              )}
             </div>
           </div>
         )}

@@ -3,7 +3,49 @@ import { Outlet, useLocation } from 'react-router-dom';
 import Navbar from './Navbar';
 import Footer from './Footer';
 import { AnimatePresence } from 'framer-motion';
-import { Toaster } from 'react-hot-toast';
+
+// Client-only Toaster component to avoid SSR hook errors
+const ClientOnlyToaster: React.FC = () => {
+  const [Toaster, setToaster] = React.useState<React.ComponentType<any> | null>(null);
+
+  React.useEffect(() => {
+    // Only import and render Toaster on client
+    if (typeof window !== 'undefined') {
+      import('react-hot-toast').then((mod) => {
+        setToaster(() => mod.Toaster);
+      });
+    }
+  }, []);
+
+  if (!Toaster) return null;
+
+  return (
+    <Toaster 
+      position="bottom-right"
+      toastOptions={{
+        duration: 4000,
+        style: {
+          background: '#363636',
+          color: '#fff',
+        },
+        success: {
+          duration: 3000,
+          iconTheme: {
+            primary: '#10b981',
+            secondary: '#fff',
+          },
+        },
+        error: {
+          duration: 5000,
+          iconTheme: {
+            primary: '#ef4444',
+            secondary: '#fff',
+          },
+        },
+      }}
+    />
+  );
+};
 
 const Layout: React.FC = () => {
   const location = useLocation();
@@ -42,30 +84,8 @@ const Layout: React.FC = () => {
         </div>
       </main>
       <Footer />
-      <Toaster 
-        position="bottom-right"
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: '#363636',
-            color: '#fff',
-          },
-          success: {
-            duration: 3000,
-            iconTheme: {
-              primary: '#10b981',
-              secondary: '#fff',
-            },
-          },
-          error: {
-            duration: 5000,
-            iconTheme: {
-              primary: '#ef4444',
-              secondary: '#fff',
-            },
-          },
-        }}
-      />
+      {/* Render Toaster only on client to avoid SSR hook errors */}
+      <ClientOnlyToaster />
     </div>
   );
 };

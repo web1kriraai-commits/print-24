@@ -61,6 +61,8 @@ interface GlossProduct {
         value: string;
         label: string;
         priceMultiplier: number;
+        image?: string;
+        description?: string;
       }>;
       defaultValue?: string;
     };
@@ -71,6 +73,8 @@ interface GlossProduct {
       value: string;
       label: string;
       priceMultiplier: number;
+      image?: string;
+      description?: string;
     }>;
   }>;
   quantityDiscounts?: Array<{
@@ -111,6 +115,8 @@ const GlossProductSelection: React.FC = () => {
   
   // Dynamic attributes state - store selected values for each attribute
   const [selectedDynamicAttributes, setSelectedDynamicAttributes] = useState<{ [key: string]: string | number | boolean | File | null }>({});
+  // Track which attributes have been explicitly selected by the user (for image updates)
+  const [userSelectedAttributes, setUserSelectedAttributes] = useState<Set<string>>(new Set());
   // Selected product options (from options table)
   const [selectedProductOptions, setSelectedProductOptions] = useState<string[]>([]);
   
@@ -251,6 +257,42 @@ const GlossProductSelection: React.FC = () => {
                     subcategoryId = productData.subcategory;
                   }
                 }
+                
+                // Map and set the product directly if fetched by ID
+                const mappedProduct: GlossProduct = {
+                  _id: productData._id,
+                  id: productData._id,
+                  name: productData.name || '',
+                  description: productData.description || '',
+                  descriptionArray: productData.descriptionArray || (productData.description ? [productData.description] : []),
+                  filters: {
+                    printingOption: productData.filters?.printingOption || [],
+                    orderQuantity: productData.filters?.orderQuantity || { min: 1000, max: 72000, multiples: 1000 },
+                    deliverySpeed: productData.filters?.deliverySpeed || [],
+                    textureType: productData.filters?.textureType || undefined,
+                    filterPricesEnabled: productData.filters?.filterPricesEnabled || false,
+                    printingOptionPrices: productData.filters?.printingOptionPrices || [],
+                    deliverySpeedPrices: productData.filters?.deliverySpeedPrices || [],
+                    textureTypePrices: productData.filters?.textureTypePrices || [],
+                  },
+                  basePrice: productData.basePrice || 0,
+                  image: productData.image,
+                  subcategory: productData.subcategory,
+                  options: productData.options || [],
+                  dynamicAttributes: productData.dynamicAttributes || [], // Preserve populated attributeType objects
+                  quantityDiscounts: productData.quantityDiscounts || [],
+                  maxFileSizeMB: productData.maxFileSizeMB,
+                  minFileWidth: productData.minFileWidth,
+                  maxFileWidth: productData.maxFileWidth,
+                  minFileHeight: productData.minFileHeight,
+                  maxFileHeight: productData.maxFileHeight,
+                  blockCDRandJPG: productData.blockCDRandJPG || false,
+                  additionalDesignCharge: productData.additionalDesignCharge || 0,
+                  gstPercentage: productData.gstPercentage || 0,
+                  showPriceIncludingGst: productData.showPriceIncludingGst || false,
+                  instructions: productData.instructions || "",
+                };
+                setSelectedProduct(mappedProduct);
               }
             }
           } catch (err) {
@@ -478,6 +520,8 @@ const GlossProductSelection: React.FC = () => {
       });
     }
     setSelectedDynamicAttributes(initialAttributes);
+    // Reset user-selected attributes so main product image is shown initially
+    setUserSelectedAttributes(new Set());
     
     // Reset selected product options
     setSelectedProductOptions([]);
@@ -2312,28 +2356,53 @@ const GlossProductSelection: React.FC = () => {
                     <div className="w-full h-full flex items-center justify-center">
                       {(() => {
                         // Get the image to display based on selected attributes
+                        // Start with main product image, only update if user has explicitly selected an attribute
                         let displayImage = selectedSubCategory?.image || selectedProduct?.image || "/Glossy.png";
                         let displayAlt = selectedSubCategory?.name || selectedProduct?.name || "Product Preview";
                         
-                        // Check if any selected attribute has an image
-                        if (selectedProduct && selectedProduct.dynamicAttributes) {
-                          for (const attr of selectedProduct.dynamicAttributes) {
-                            if (!attr.isEnabled) continue;
+                        // Only check for attribute images if user has explicitly selected at least one attribute
+                        // This ensures the main product image is shown initially
+                        if (selectedProduct && selectedProduct.dynamicAttributes && userSelectedAttributes.size > 0) {
+                          const sortedAttributes = [...selectedProduct.dynamicAttributes]
+                            .filter(attr => attr.isEnabled)
+                            .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+                          
+                          for (const attr of sortedAttributes) {
                             const attrType = typeof attr.attributeType === 'object' ? attr.attributeType : null;
                             if (!attrType) continue;
                             
+                            // Only use attribute image if user has explicitly selected this attribute
+                            if (!userSelectedAttributes.has(attrType._id)) continue;
+                            
                             const selectedValue = selectedDynamicAttributes[attrType._id];
                             if (!selectedValue) continue;
+                            
+                            // Handle both single values and arrays (for checkbox inputs)
+                            const selectedValues = Array.isArray(selectedValue) ? selectedValue : [selectedValue];
                             
                             const attributeValues = attr.customValues && attr.customValues.length > 0 
                               ? attr.customValues 
                               : attrType.attributeValues || [];
                             
-                            const selectedAttrValue = attributeValues.find((av: any) => av.value === selectedValue);
-                            if (selectedAttrValue && selectedAttrValue.image) {
-                              displayImage = selectedAttrValue.image;
-                              displayAlt = `${attrType.attributeName} - ${selectedAttrValue.label}`;
-                              break; // Use the first attribute with an image
+                            // Find the first selected value that has an image
+                            let foundImage = false;
+                            for (const val of selectedValues) {
+                              const selectedAttrValue = attributeValues.find((av: any) => 
+                                av.value === val || av.value === String(val)
+                              );
+                              
+                              if (selectedAttrValue && selectedAttrValue.image && selectedAttrValue.image.trim() !== "") {
+                                displayImage = selectedAttrValue.image;
+                                displayAlt = `${attrType.attributeName} - ${selectedAttrValue.label}`;
+                                foundImage = true;
+                                // Use the first matching image and break
+                                break;
+                              }
+                            }
+                            
+                            // If we found an image, use it (prioritize by displayOrder) and stop searching
+                            if (foundImage) {
+                              break;
                             }
                           }
                         }
@@ -3061,17 +3130,50 @@ const GlossProductSelection: React.FC = () => {
                                 .filter((attr) => attr.isEnabled)
                                 .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
                                 .map((attr) => {
-                                  const attrType = typeof attr.attributeType === 'object' ? attr.attributeType : null;
-                                  if (!attrType) return null;
+                                  // Handle both populated (object) and unpopulated (string ID) attributeType
+                                  let attrType = null;
+                                  if (typeof attr.attributeType === 'object' && attr.attributeType !== null) {
+                                    attrType = attr.attributeType;
+                                  } else if (typeof attr.attributeType === 'string' && attr.attributeType.trim() !== '') {
+                                    // If attributeType is just an ID string, we can't display it without fetching
+                                    // This shouldn't happen if backend populate is working, but handle gracefully
+                                    console.warn(`Attribute type not populated for attribute: ${attr.attributeType}`);
+                                    return null;
+                                  }
+                                  
+                                  if (!attrType || !attrType._id) {
+                                    console.warn('Invalid attributeType:', attr.attributeType);
+                                    return null;
+                                  }
                                   
                                   const attributeValues = attr.customValues && attr.customValues.length > 0 
                                     ? attr.customValues 
                                     : attrType.attributeValues || [];
                                   
-                                  if (attributeValues.length === 0) return null;
+                                  // For DROPDOWN, RADIO, and POPUP input styles, we need at least 2 options to display
+                                  // For TEXT, NUMBER, FILE_UPLOAD, and other input styles, we can display even with 0 or 1 values
+                                  const requiresMultipleOptions = ['DROPDOWN', 'RADIO', 'POPUP'].includes(attrType.inputStyle);
                                   
-                                  // Auto-skip: Don't render if only one option (already auto-selected)
-                                  if (attributeValues.length === 1) return null;
+                                  if (requiresMultipleOptions) {
+                                    // For dropdown/radio/popup, need at least 2 options
+                                    if (attributeValues.length < 2) {
+                                      console.warn(`Attribute "${attrType.attributeName}" (${attrType.inputStyle}) requires at least 2 options but only has ${attributeValues.length}`);
+                                      return (
+                                        <div key={attrType._id} className="mb-6 sm:mb-8 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                          <label className="block text-xs sm:text-sm font-bold text-cream-900 mb-2 sm:mb-3 uppercase tracking-wider">
+                                            {sectionNum++}. {attrType.attributeName}
+                                            {attr.isRequired && <span className="text-red-500 ml-1">*</span>}
+                                          </label>
+                                          <p className="text-sm text-yellow-800">
+                                            This attribute is not available because it requires at least 2 options. Please contact support.
+                                          </p>
+                                        </div>
+                                      );
+                                    }
+                                  } else {
+                                    // For other input types (TEXT, NUMBER, FILE_UPLOAD), can display even with 0 values
+                                    // They don't need pre-defined options
+                                  }
                                   
                                   return (
                                     <div key={attrType._id} className="mb-6 sm:mb-8">
@@ -3080,29 +3182,50 @@ const GlossProductSelection: React.FC = () => {
                                         {attr.isRequired && <span className="text-red-500 ml-1">*</span>}
                                       </label>
                                       
-                                      {attrType.inputStyle === 'DROPDOWN' && (
+                                      {(attrType.inputStyle === 'DROPDOWN' || attrType.inputStyle === 'POPUP') && (
                                         <div data-attribute={attrType._id} data-attribute-name={attrType.attributeName}>
-                                          <Select
-                                            options={attributeValues.map((av: any) => ({
-                                              value: av.value,
-                                              label: `${av.label}${av.priceMultiplier && av.priceMultiplier !== 1 && selectedProduct ? ` (+₹${((selectedProduct.basePrice || 0) * (av.priceMultiplier - 1)).toFixed(2)}/unit)` : ''}`
-                                            }))}
-                                            value={selectedDynamicAttributes[attrType._id] as string || ""}
-                                            onValueChange={(value) => {
-                                              setSelectedDynamicAttributes({
-                                                ...selectedDynamicAttributes,
-                                                [attrType._id]: value
-                                              });
-                                            }}
-                                            placeholder={`Select ${attrType.attributeName}`}
-                                            className="w-full"
-                                          />
+                                          {attributeValues.length === 0 ? (
+                                            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                              <p className="text-sm text-yellow-800">
+                                                No options available for this attribute. Please contact support.
+                                              </p>
+                                            </div>
+                                          ) : (
+                                            <Select
+                                              options={attributeValues
+                                                .filter((av: any) => av && av.value && av.label) // Filter out invalid options
+                                                .map((av: any) => ({
+                                                  value: av.value,
+                                                  label: `${av.label}${av.priceMultiplier && av.priceMultiplier !== 1 && selectedProduct ? ` (+₹${((selectedProduct.basePrice || 0) * (av.priceMultiplier - 1)).toFixed(2)}/unit)` : ''}`
+                                                }))}
+                                              value={selectedDynamicAttributes[attrType._id] as string || ""}
+                                              onValueChange={(value) => {
+                                                setSelectedDynamicAttributes({
+                                                  ...selectedDynamicAttributes,
+                                                  [attrType._id]: value
+                                                });
+                                                // Mark this attribute as user-selected for image updates
+                                                setUserSelectedAttributes(prev => new Set(prev).add(attrType._id));
+                                              }}
+                                              placeholder={`Select ${attrType.attributeName}`}
+                                              className="w-full"
+                                            />
+                                          )}
                                         </div>
                                       )}
                                       
                                       {attrType.inputStyle === 'RADIO' && (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3" data-attribute={attrType._id}>
-                                          {attributeValues.map((av: any) => {
+                                          {attributeValues.length === 0 ? (
+                                            <div className="col-span-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                              <p className="text-sm text-yellow-800">
+                                                No options available for this attribute. Please contact support.
+                                              </p>
+                                            </div>
+                                          ) : (
+                                            attributeValues
+                                              .filter((av: any) => av && av.value && av.label) // Filter out invalid options
+                                              .map((av: any) => {
                                             // Format price display as per unit price
                                             const getPriceDisplay = () => {
                                               if (!av.priceMultiplier || av.priceMultiplier === 1 || !selectedProduct) return null;
@@ -3122,6 +3245,8 @@ const GlossProductSelection: React.FC = () => {
                                                     ...selectedDynamicAttributes,
                                                     [attrType._id]: av.value
                                                   });
+                                                  // Mark this attribute as user-selected for image updates
+                                                  setUserSelectedAttributes(prev => new Set(prev).add(attrType._id));
                                                 }}
                                                 className={`p-4 rounded-xl border text-left transition-all duration-200 relative ${
                                                   isSelected
@@ -3151,13 +3276,23 @@ const GlossProductSelection: React.FC = () => {
                                                 )}
                                               </button>
                                             );
-                                          })}
+                                          })
+                                          )}
                                         </div>
                                       )}
                                       
                                       {attrType.inputStyle === 'CHECKBOX' && (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3" data-attribute={attrType._id}>
-                                          {attributeValues.map((av: any) => {
+                                          {attributeValues.length === 0 ? (
+                                            <div className="col-span-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                              <p className="text-sm text-yellow-800">
+                                                No options available for this attribute. Please contact support.
+                                              </p>
+                                            </div>
+                                          ) : (
+                                            attributeValues
+                                              .filter((av: any) => av && av.value && av.label) // Filter out invalid options
+                                              .map((av: any) => {
                                             // Format price display as per unit price
                                             const getPriceDisplay = () => {
                                               if (!av.priceMultiplier || av.priceMultiplier === 1 || !selectedProduct) return null;
@@ -3182,6 +3317,8 @@ const GlossProductSelection: React.FC = () => {
                                                     ...selectedDynamicAttributes,
                                                     [attrType._id]: newValue
                                                   });
+                                                  // Mark this attribute as user-selected for image updates
+                                                  setUserSelectedAttributes(prev => new Set(prev).add(attrType._id));
                                                 }}
                                                 className={`p-4 rounded-xl border text-left transition-all duration-200 relative ${
                                                   isSelected
@@ -3211,7 +3348,8 @@ const GlossProductSelection: React.FC = () => {
                                                 )}
                                               </button>
                                             );
-                                          })}
+                                          })
+                                          )}
                                         </div>
                                       )}
                                       
@@ -3225,6 +3363,8 @@ const GlossProductSelection: React.FC = () => {
                                                 ...selectedDynamicAttributes,
                                                 [attrType._id]: e.target.value
                                               });
+                                              // Mark this attribute as user-selected for image updates
+                                              setUserSelectedAttributes(prev => new Set(prev).add(attrType._id));
                                             }}
                                             placeholder={`Enter ${attrType.attributeName}`}
                                             className="w-full px-4 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500"
@@ -3242,6 +3382,8 @@ const GlossProductSelection: React.FC = () => {
                                                 ...selectedDynamicAttributes,
                                                 [attrType._id]: parseFloat(e.target.value) || 0
                                               });
+                                              // Mark this attribute as user-selected for image updates
+                                              setUserSelectedAttributes(prev => new Set(prev).add(attrType._id));
                                             }}
                                             placeholder={`Enter ${attrType.attributeName}`}
                                             className="w-full px-4 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500"
@@ -3259,6 +3401,10 @@ const GlossProductSelection: React.FC = () => {
                                                 ...selectedDynamicAttributes,
                                                 [attrType._id]: file
                                               });
+                                              // Mark this attribute as user-selected for image updates
+                                              if (file) {
+                                                setUserSelectedAttributes(prev => new Set(prev).add(attrType._id));
+                                              }
                                             }}
                                             className="w-full px-4 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500"
                                             accept="*/*"

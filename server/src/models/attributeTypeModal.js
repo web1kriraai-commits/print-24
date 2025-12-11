@@ -27,7 +27,7 @@ const AttributeTypeSchema = new mongoose.Schema(
     // How the option is presented: Dropdown, Text Field, File Upload
     inputStyle: {
       type: String,
-      enum: ["DROPDOWN", "TEXT_FIELD", "FILE_UPLOAD", "NUMBER", "CHECKBOX", "RADIO"],
+      enum: ["DROPDOWN", "TEXT_FIELD", "FILE_UPLOAD", "NUMBER", "CHECKBOX", "RADIO", "POPUP"],
       required: true,
       default: "DROPDOWN",
     },

@@ -184,10 +184,28 @@ export const createProduct = async (req, res) => {
         parsedDynamicAttributes = typeof dynamicAttributes === 'string' 
           ? JSON.parse(dynamicAttributes) 
           : dynamicAttributes;
+        
+        // Validate and filter dynamicAttributes
+        if (Array.isArray(parsedDynamicAttributes)) {
+          parsedDynamicAttributes = parsedDynamicAttributes
+            .filter((da) => da && da.attributeType) // Filter out null/undefined entries
+            .map((da) => ({
+              attributeType: da.attributeType,
+              isEnabled: da.isEnabled !== undefined ? da.isEnabled : true,
+              isRequired: da.isRequired !== undefined ? da.isRequired : false,
+              displayOrder: da.displayOrder !== undefined ? da.displayOrder : 0,
+              customValues: Array.isArray(da.customValues) ? da.customValues : [],
+            }));
+        } else {
+          parsedDynamicAttributes = [];
+        }
       } catch (err) {
+        console.error("Error parsing dynamicAttributes:", err);
         return res.status(400).json({ error: "Invalid JSON in dynamicAttributes" });
       }
     }
+    
+    console.log("Parsed dynamicAttributes for product creation:", JSON.stringify(parsedDynamicAttributes, null, 2));
 
     // Parse quantityDiscounts JSON
     let parsedQuantityDiscounts = [];
@@ -287,11 +305,21 @@ export const createProduct = async (req, res) => {
       })
       .populate({
         path: "dynamicAttributes.attributeType",
-        model: "AttributeType"
+        model: "AttributeType",
+        select: "_id attributeName inputStyle primaryEffectType isPricingAttribute attributeValues defaultValue isRequired isFilterable displayOrder"
       });
 
     console.log("Product created with subcategory ID:", subcategory);
     console.log("Populated product subcategory:", populatedProduct?.subcategory);
+    console.log("Product created with dynamicAttributes count:", populatedProduct?.dynamicAttributes?.length || 0);
+    if (populatedProduct?.dynamicAttributes && populatedProduct.dynamicAttributes.length > 0) {
+      console.log("Dynamic attributes details:", populatedProduct.dynamicAttributes.map((da) => ({
+        attributeTypeId: typeof da.attributeType === 'object' ? da.attributeType?._id : da.attributeType,
+        attributeName: typeof da.attributeType === 'object' ? da.attributeType?.attributeName : 'N/A',
+        isEnabled: da.isEnabled,
+        isRequired: da.isRequired
+      })));
+    }
 
     return res.json({
       success: true,
@@ -785,10 +813,28 @@ export const updateProduct = async (req, res) => {
         parsedDynamicAttributes = typeof dynamicAttributes === 'string'
           ? JSON.parse(dynamicAttributes)
           : dynamicAttributes;
+        
+        // Validate and filter dynamicAttributes
+        if (Array.isArray(parsedDynamicAttributes)) {
+          parsedDynamicAttributes = parsedDynamicAttributes
+            .filter((da) => da && da.attributeType) // Filter out null/undefined entries
+            .map((da) => ({
+              attributeType: da.attributeType,
+              isEnabled: da.isEnabled !== undefined ? da.isEnabled : true,
+              isRequired: da.isRequired !== undefined ? da.isRequired : false,
+              displayOrder: da.displayOrder !== undefined ? da.displayOrder : 0,
+              customValues: Array.isArray(da.customValues) ? da.customValues : [],
+            }));
+        } else {
+          parsedDynamicAttributes = [];
+        }
       } catch (err) {
+        console.error("Error parsing dynamicAttributes:", err);
         return res.status(400).json({ error: "Invalid JSON in dynamicAttributes" });
       }
     }
+    
+    console.log("Parsed dynamicAttributes for product update:", JSON.stringify(parsedDynamicAttributes, null, 2));
 
     // Parse quantityDiscounts JSON
     let parsedQuantityDiscounts = product.quantityDiscounts || [];
@@ -942,7 +988,8 @@ export const updateProduct = async (req, res) => {
     })
     .populate({
       path: "dynamicAttributes.attributeType",
-      model: "AttributeType"
+      model: "AttributeType",
+      select: "_id attributeName inputStyle primaryEffectType isPricingAttribute attributeValues"
     });
 
     return res.json({

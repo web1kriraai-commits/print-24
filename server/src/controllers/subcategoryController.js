@@ -5,6 +5,32 @@ import Sequence from "../models/sequenceModal.js";
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
 
+// Helper function to generate a unique slug by appending increment numbers
+const generateUniqueSubCategorySlug = async (baseSlug, excludeId = null) => {
+  let uniqueSlug = baseSlug;
+  let counter = 1;
+  
+  // Check if slug exists (excluding current subcategory if updating)
+  let existingSubCategory = await SubCategory.findOne({ slug: uniqueSlug });
+  if (excludeId && existingSubCategory && existingSubCategory._id.toString() === excludeId) {
+    // If it's the same subcategory being updated, the slug is already unique
+    return uniqueSlug;
+  }
+  
+  // Keep incrementing until we find a unique slug
+  while (existingSubCategory) {
+    uniqueSlug = `${baseSlug}-${counter}`;
+    existingSubCategory = await SubCategory.findOne({ slug: uniqueSlug });
+    if (excludeId && existingSubCategory && existingSubCategory._id.toString() === excludeId) {
+      // If it's the same subcategory being updated, the slug is already unique
+      break;
+    }
+    counter++;
+  }
+  
+  return uniqueSlug;
+};
+
 export const createSubCategory = async (req, res) => {
   try {
     const { name, description, category, slug, sortOrder } = req.body;
@@ -43,7 +69,15 @@ export const createSubCategory = async (req, res) => {
     }
 
     // Generate slug from name if not provided
-    let subCategorySlug = slug || name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    let subCategorySlug;
+    if (slug) {
+      // Slug was manually provided - use it as-is (will show error if duplicate)
+      subCategorySlug = slug;
+    } else {
+      // Slug was auto-generated - make it unique by appending numbers if needed
+      const baseSlug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      subCategorySlug = await generateUniqueSubCategorySlug(baseSlug);
+    }
 
     let imageUrl = null;
 
@@ -221,7 +255,24 @@ export const updateSubCategory = async (req, res) => {
     }
 
     // Generate slug from name if not provided
-    let subCategorySlug = slug || (name ? name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : subCategory.slug);
+    let subCategorySlug;
+    if (slug) {
+      // Slug was manually provided
+      // If it's the same as current slug, no need to update
+      if (slug === subCategory.slug) {
+        subCategorySlug = subCategory.slug; // Keep existing, no update needed
+      } else {
+        // Different slug - use it as-is (MongoDB will show error if duplicate)
+        subCategorySlug = slug;
+      }
+    } else if (name) {
+      // Slug was auto-generated - make it unique by appending numbers if needed
+      const baseSlug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      subCategorySlug = await generateUniqueSubCategorySlug(baseSlug, subCategoryId);
+    } else {
+      // Keep existing slug if name didn't change
+      subCategorySlug = subCategory.slug;
+    }
 
     // Validate image file type if new image is uploaded
     if (req.file) {
@@ -262,16 +313,23 @@ export const updateSubCategory = async (req, res) => {
       }
     }
 
+    // Build update object
+    const updateData = {
+      name: name !== undefined ? name : subCategory.name,
+      description: description !== undefined ? description : subCategory.description,
+      category: categoryId, // Use the validated category ObjectId
+      image: imageUrl,
+      sortOrder: parsedSortOrder,
+    };
+
+    // Only update slug if it's different from the current one
+    if (subCategorySlug && subCategorySlug !== subCategory.slug) {
+      updateData.slug = subCategorySlug;
+    }
+
     const updatedSubCategory = await SubCategory.findByIdAndUpdate(
       subCategoryId,
-      {
-        name: name !== undefined ? name : subCategory.name,
-        description: description !== undefined ? description : subCategory.description,
-        category: categoryId, // Use the validated category ObjectId
-        slug: subCategorySlug,
-        image: imageUrl,
-        sortOrder: parsedSortOrder,
-      },
+      updateData,
       { new: true }
     ).populate("category");
 
