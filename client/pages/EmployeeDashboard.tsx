@@ -197,6 +197,7 @@ const EmployeeDashboard: React.FC = () => {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       Accept: "application/json",
+      "ngrok-skip-browser-warning": "true",
     };
   };
 

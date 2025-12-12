@@ -54,6 +54,14 @@ export const createAttributeType = async (req, res) => {
           if (!av.value || !av.label) {
             return res.status(400).json({ error: "Each attribute value must have 'value' and 'label' fields" });
           }
+          // Validate subattributes if they exist
+          if (av.subattributes && Array.isArray(av.subattributes)) {
+            for (const subav of av.subattributes) {
+              if (!subav.value || !subav.label) {
+                return res.status(400).json({ error: "Each subattribute must have 'value' and 'label' fields" });
+              }
+            }
+          }
         }
         
         // For DROPDOWN, RADIO, POPUP input styles, require at least 2 options

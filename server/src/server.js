@@ -48,7 +48,8 @@ app.use(
         "http://localhost:5000",
         "http://127.0.0.1:5000",
         "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173"
+        "http://127.0.0.1:5173",
+        "https://kelsi-kimonoed-corene.ngrok-free.dev"
       ];
       
       // Allow if origin is in the list or if it's a localhost/127.0.0.1 origin
@@ -70,7 +71,8 @@ app.use(
       "X-Requested-With",
       "Access-Control-Allow-Origin",
       "Access-Control-Allow-Headers",
-      "Access-Control-Allow-Methods"
+      "Access-Control-Allow-Methods",
+      "ngrok-skip-browser-warning"
     ],
     exposedHeaders: [
       "Content-Type",

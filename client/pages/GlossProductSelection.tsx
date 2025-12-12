@@ -42,6 +42,10 @@ interface GlossProduct {
     };
     deliverySpeed: string[];
     textureType?: string[];
+    filterPricesEnabled?: boolean;
+    printingOptionPrices?: Array<{ name: string; priceAdd: number }>;
+    deliverySpeedPrices?: Array<{ name: string; priceAdd: number }>;
+    textureTypePrices?: Array<{ name: string; priceAdd: number }>;
   };
   basePrice: number;
   image?: string;
@@ -63,6 +67,13 @@ interface GlossProduct {
         priceMultiplier: number;
         image?: string;
         description?: string;
+        subattributes?: Array<{
+          value: string;
+          label: string;
+          priceMultiplier: number;
+          image?: string;
+          description?: string;
+        }>;
       }>;
       defaultValue?: string;
     };
@@ -75,6 +86,13 @@ interface GlossProduct {
       priceMultiplier: number;
       image?: string;
       description?: string;
+      subattributes?: Array<{
+        value: string;
+        label: string;
+        priceMultiplier: number;
+        image?: string;
+        description?: string;
+      }>;
     }>;
   }>;
   quantityDiscounts?: Array<{
@@ -114,7 +132,7 @@ const GlossProductSelection: React.FC = () => {
   const [quantity, setQuantity] = useState<number>(1000);
   
   // Dynamic attributes state - store selected values for each attribute
-  const [selectedDynamicAttributes, setSelectedDynamicAttributes] = useState<{ [key: string]: string | number | boolean | File | null }>({});
+  const [selectedDynamicAttributes, setSelectedDynamicAttributes] = useState<{ [key: string]: string | number | boolean | File | any[] | null }>({});
   // Track which attributes have been explicitly selected by the user (for image updates)
   const [userSelectedAttributes, setUserSelectedAttributes] = useState<Set<string>>(new Set());
   // Selected product options (from options table)
@@ -804,16 +822,35 @@ const GlossProductSelection: React.FC = () => {
                 } else {
                   // Handle single value attributes
                   const attrValue = attributeValues.find((av: any) => av.value === selectedValue);
-                  if (attrValue && attrValue.priceMultiplier && attrValue.priceMultiplier !== 1) {
-                    const oldPrice = basePrice;
-                    basePrice = basePrice * attrValue.priceMultiplier;
-                    const charge = (basePrice - oldPrice) * quantity;
-                    if (charge !== 0) {
-                      dynamicAttributesChargesList.push({
-                        name: attrType.attributeName,
-                        label: attrValue.label || selectedValue,
-                        charge: charge
-                      });
+                  if (attrValue) {
+                    // Check for subattribute
+                    const subAttributeKey = `${attrType._id}_sub`;
+                    const subAttributeValue = selectedDynamicAttributes[subAttributeKey];
+                    let subAttributeDetails: any = null;
+                    
+                    if (subAttributeValue && attrValue.subattributes) {
+                      subAttributeDetails = attrValue.subattributes.find((subav: any) => subav.value === subAttributeValue);
+                    }
+                    
+                    // Calculate combined multiplier (main * subattribute)
+                    const mainMultiplier = attrValue.priceMultiplier || 1;
+                    const subMultiplier = subAttributeDetails?.priceMultiplier || 1;
+                    const combinedMultiplier = mainMultiplier * subMultiplier;
+                    
+                    if (combinedMultiplier !== 1) {
+                      const oldPrice = basePrice;
+                      basePrice = basePrice * combinedMultiplier;
+                      const charge = (basePrice - oldPrice) * quantity;
+                      if (charge !== 0) {
+                        const label = subAttributeDetails 
+                          ? `${attrValue.label || String(selectedValue)} - ${subAttributeDetails.label}`
+                          : attrValue.label || String(selectedValue);
+                        dynamicAttributesChargesList.push({
+                          name: attrType.attributeName,
+                          label: label,
+                          charge: charge
+                        });
+                      }
                     }
                   }
                 }
@@ -1109,6 +1146,7 @@ const GlossProductSelection: React.FC = () => {
     const token = localStorage.getItem("token");
     return {
       "Content-Type": "application/json",
+      "ngrok-skip-browser-warning": "true",
       ...(token && { Authorization: `Bearer ${token}` }),
     };
   };
@@ -1841,9 +1879,19 @@ const GlossProductSelection: React.FC = () => {
         priceAdd: number;
         description?: string;
         image?: string;
+        subattribute?: {
+          value: string;
+          label: string;
+          priceMultiplier: number;
+        };
       }> = [];
 
       Object.keys(selectedDynamicAttributes).forEach(key => {
+        // Skip subattribute keys (they'll be handled with their parent attribute)
+        if (key.endsWith('_sub')) {
+          return;
+        }
+        
         const value = selectedDynamicAttributes[key];
         if (value !== null && value !== undefined && value !== "") {
           // Find the attribute type in product
@@ -1869,6 +1917,16 @@ const GlossProductSelection: React.FC = () => {
                 selectedValueDetails = allValues.find((av: any) => av.value === value || av.value === value.toString());
               }
 
+              // Check for subattribute
+              const subAttributeKey = `${key}_sub`;
+              const subAttributeValue = selectedDynamicAttributes[subAttributeKey];
+              let subAttributeDetails: any = null;
+              
+              if (selectedValueDetails && subAttributeValue && !Array.isArray(selectedValueDetails)) {
+                const subattributes = (selectedValueDetails as any).subattributes || [];
+                subAttributeDetails = subattributes.find((subav: any) => subav.value === subAttributeValue || subav.value === subAttributeValue.toString());
+              }
+
               if (selectedValueDetails) {
                 if (Array.isArray(selectedValueDetails)) {
                   // Multiple values
@@ -1883,18 +1941,37 @@ const GlossProductSelection: React.FC = () => {
                     priceAdd: 0,
                     description: selectedValueDetails.map((sv: any) => sv.description).filter(Boolean).join("; ") || undefined,
                     image: selectedValueDetails[0]?.image || undefined,
+                    subattribute: subAttributeDetails ? {
+                      value: subAttributeDetails.value,
+                      label: subAttributeDetails.label,
+                      priceMultiplier: subAttributeDetails.priceMultiplier,
+                    } : undefined,
                   });
                 } else {
-                  // Single value
+                  // Single value - include subattribute if present
+                  const finalLabel = subAttributeDetails 
+                    ? `${selectedValueDetails.label || value?.toString() || ""} - ${subAttributeDetails.label}`
+                    : selectedValueDetails.label || value?.toString() || "";
+                  
+                  // Combine price multipliers (main + subattribute)
+                  const mainMultiplier = selectedValueDetails.priceMultiplier || 1;
+                  const subMultiplier = subAttributeDetails?.priceMultiplier || 1;
+                  const combinedMultiplier = mainMultiplier * subMultiplier;
+                  
                   selectedDynamicAttributesArray.push({
                     attributeTypeId: key,
                     attributeName: attrType.attributeName || "Attribute",
                     attributeValue: value,
-                    label: selectedValueDetails.label || value?.toString() || "",
-                    priceMultiplier: selectedValueDetails.priceMultiplier || undefined,
+                    label: finalLabel,
+                    priceMultiplier: combinedMultiplier !== 1 ? combinedMultiplier : undefined,
                     priceAdd: 0,
                     description: selectedValueDetails.description || undefined,
                     image: selectedValueDetails.image || undefined,
+                    subattribute: subAttributeDetails ? {
+                      value: subAttributeDetails.value,
+                      label: subAttributeDetails.label,
+                      priceMultiplier: subAttributeDetails.priceMultiplier,
+                    } : undefined,
                   });
                 }
               } else {
@@ -1972,6 +2049,7 @@ const GlossProductSelection: React.FC = () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
           },
           body: JSON.stringify(orderDataWithAccount),
         });
@@ -3292,94 +3370,206 @@ const GlossProductSelection: React.FC = () => {
                                               </p>
                                             </div>
                                           ) : (
-                                            <Select
-                                              options={attributeValues
-                                                .filter((av: any) => av && av.value && av.label) // Filter out invalid options
-                                                .map((av: any) => ({
-                                                  value: av.value,
-                                                  label: `${av.label}${av.priceMultiplier && av.priceMultiplier !== 1 && selectedProduct ? ` (+₹${((selectedProduct.basePrice || 0) * (av.priceMultiplier - 1)).toFixed(2)}/unit)` : ''}`
-                                                }))}
-                                              value={selectedDynamicAttributes[attrType._id] as string || ""}
-                                              onValueChange={(value) => {
-                                                setSelectedDynamicAttributes({
-                                                  ...selectedDynamicAttributes,
-                                                  [attrType._id]: value
-                                                });
-                                                // Mark this attribute as user-selected for image updates
-                                                setUserSelectedAttributes(prev => new Set(prev).add(attrType._id));
-                                              }}
-                                              placeholder={`Select ${attrType.attributeName}`}
-                                              className="w-full"
-                                            />
+                                            <>
+                                              <Select
+                                                options={attributeValues
+                                                  .filter((av: any) => av && av.value && av.label) // Filter out invalid options
+                                                  .map((av: any) => ({
+                                                    value: av.value,
+                                                    label: `${av.label}${av.priceMultiplier && av.priceMultiplier !== 1 && selectedProduct ? ` (+₹${((selectedProduct.basePrice || 0) * (av.priceMultiplier - 1)).toFixed(2)}/unit)` : ''}`
+                                                  }))}
+                                                value={selectedDynamicAttributes[attrType._id] as string || ""}
+                                                onValueChange={(value) => {
+                                                  setSelectedDynamicAttributes({
+                                                    ...selectedDynamicAttributes,
+                                                    [attrType._id]: value,
+                                                    // Clear subattribute when main option changes
+                                                    [`${attrType._id}_sub`]: null
+                                                  });
+                                                  // Mark this attribute as user-selected for image updates
+                                                  setUserSelectedAttributes(prev => new Set(prev).add(attrType._id));
+                                                }}
+                                                placeholder={`Select ${attrType.attributeName}`}
+                                                className="w-full"
+                                              />
+                                              {/* Show subattributes if the selected option has subattributes */}
+                                              {(() => {
+                                                const selectedValue = selectedDynamicAttributes[attrType._id] as string;
+                                                const selectedOption = attributeValues.find((av: any) => av.value === selectedValue);
+                                                const subattributes = selectedOption?.subattributes || [];
+                                                
+                                                if (subattributes.length > 0) {
+                                                  return (
+                                                    <div className="mt-4 pl-4 border-l-2 border-cream-300">
+                                                      <label className="block text-xs sm:text-sm font-semibold text-cream-700 mb-2">
+                                                        Select Subattribute for "{selectedOption?.label}"
+                                                      </label>
+                                                      <Select
+                                                        options={subattributes
+                                                          .filter((subav: any) => subav && subav.value && subav.label)
+                                                          .map((subav: any) => ({
+                                                            value: subav.value,
+                                                            label: `${subav.label}${subav.priceMultiplier && subav.priceMultiplier !== 1 && selectedProduct ? ` (+₹${((selectedProduct.basePrice || 0) * (subav.priceMultiplier - 1)).toFixed(2)}/unit)` : ''}`
+                                                          }))}
+                                                        value={selectedDynamicAttributes[`${attrType._id}_sub`] as string || ""}
+                                                        onValueChange={(value) => {
+                                                          setSelectedDynamicAttributes({
+                                                            ...selectedDynamicAttributes,
+                                                            [`${attrType._id}_sub`]: value
+                                                          });
+                                                        }}
+                                                        placeholder={`Select subattribute for ${selectedOption?.label}`}
+                                                        className="w-full"
+                                                      />
+                                                    </div>
+                                                  );
+                                                }
+                                                return null;
+                                              })()}
+                                            </>
                                           )}
                                         </div>
                                       )}
                                       
                                       {attrType.inputStyle === 'RADIO' && (
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3" data-attribute={attrType._id}>
-                                          {attributeValues.length === 0 ? (
-                                            <div className="col-span-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                              <p className="text-sm text-yellow-800">
-                                                No options available for this attribute. Please contact support.
-                                              </p>
-                                            </div>
-                                          ) : (
-                                            attributeValues
-                                              .filter((av: any) => av && av.value && av.label) // Filter out invalid options
-                                              .map((av: any) => {
-                                            // Format price display as per unit price
-                                            const getPriceDisplay = () => {
-                                              if (!av.priceMultiplier || av.priceMultiplier === 1 || !selectedProduct) return null;
-                                              const basePrice = selectedProduct.basePrice || 0;
-                                              const pricePerUnit = basePrice * (av.priceMultiplier - 1);
-                                              if (Math.abs(pricePerUnit) < 0.01) return null;
-                                              return `+₹${pricePerUnit.toFixed(2)}/unit`;
-                                            };
+                                        <>
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3" data-attribute={attrType._id}>
+                                            {attributeValues.length === 0 ? (
+                                              <div className="col-span-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                                <p className="text-sm text-yellow-800">
+                                                  No options available for this attribute. Please contact support.
+                                                </p>
+                                              </div>
+                                            ) : (
+                                              attributeValues
+                                                .filter((av: any) => av && av.value && av.label) // Filter out invalid options
+                                                .map((av: any) => {
+                                              // Format price display as per unit price
+                                              const getPriceDisplay = () => {
+                                                if (!av.priceMultiplier || av.priceMultiplier === 1 || !selectedProduct) return null;
+                                                const basePrice = selectedProduct.basePrice || 0;
+                                                const pricePerUnit = basePrice * (av.priceMultiplier - 1);
+                                                if (Math.abs(pricePerUnit) < 0.01) return null;
+                                                return `+₹${pricePerUnit.toFixed(2)}/unit`;
+                                              };
+                                              
+                                              const isSelected = selectedDynamicAttributes[attrType._id] === av.value;
+                                              
+                                              return (
+                                                <button
+                                                  key={av.value}
+                                                  onClick={() => {
+                                                    setSelectedDynamicAttributes({
+                                                      ...selectedDynamicAttributes,
+                                                      [attrType._id]: av.value,
+                                                      // Clear subattribute when main option changes
+                                                      [`${attrType._id}_sub`]: null
+                                                    });
+                                                    // Mark this attribute as user-selected for image updates
+                                                    setUserSelectedAttributes(prev => new Set(prev).add(attrType._id));
+                                                  }}
+                                                  className={`p-4 rounded-xl border text-left transition-all duration-200 relative ${
+                                                    isSelected
+                                                      ? "border-cream-900 bg-cream-50 text-cream-900 ring-1 ring-cream-900"
+                                                      : "border-cream-200 text-cream-600 hover:border-cream-400 hover:bg-cream-50"
+                                                  }`}
+                                                >
+                                                  {isSelected && (
+                                                    <div className="absolute top-2 right-2">
+                                                      <Check size={18} className="text-cream-900" />
+                                                    </div>
+                                                  )}
+                                                  {av.image && (
+                                                    <div className="mb-2">
+                                                      <img 
+                                                        src={av.image} 
+                                                        alt={av.label} 
+                                                        className="w-full h-32 object-cover rounded-lg border border-cream-200"
+                                                      />
+                                                    </div>
+                                                  )}
+                                                  <div className="font-bold text-sm">{av.label}</div>
+                                                  {getPriceDisplay() && (
+                                                    <div className="text-xs text-cream-600 mt-1">
+                                                      {getPriceDisplay()}
+                                                    </div>
+                                                  )}
+                                                </button>
+                                              );
+                                            })
+                                            )}
+                                          </div>
+                                          {/* Show subattributes if the selected option has subattributes */}
+                                          {(() => {
+                                            const selectedValue = selectedDynamicAttributes[attrType._id] as string;
+                                            const selectedOption = attributeValues.find((av: any) => av.value === selectedValue);
+                                            const subattributes = selectedOption?.subattributes || [];
                                             
-                                            const isSelected = selectedDynamicAttributes[attrType._id] === av.value;
-                                            
-                                            return (
-                                              <button
-                                                key={av.value}
-                                                onClick={() => {
-                                                  setSelectedDynamicAttributes({
-                                                    ...selectedDynamicAttributes,
-                                                    [attrType._id]: av.value
-                                                  });
-                                                  // Mark this attribute as user-selected for image updates
-                                                  setUserSelectedAttributes(prev => new Set(prev).add(attrType._id));
-                                                }}
-                                                className={`p-4 rounded-xl border text-left transition-all duration-200 relative ${
-                                                  isSelected
-                                                    ? "border-cream-900 bg-cream-50 text-cream-900 ring-1 ring-cream-900"
-                                                    : "border-cream-200 text-cream-600 hover:border-cream-400 hover:bg-cream-50"
-                                                }`}
-                                              >
-                                                {isSelected && (
-                                                  <div className="absolute top-2 right-2">
-                                                    <Check size={18} className="text-cream-900" />
+                                            if (subattributes.length > 0) {
+                                              return (
+                                                <div className="mt-4 pl-4 border-l-2 border-cream-300">
+                                                  <label className="block text-xs sm:text-sm font-semibold text-cream-700 mb-2">
+                                                    Select Subattribute for "{selectedOption?.label}"
+                                                  </label>
+                                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                                                    {subattributes
+                                                      .filter((subav: any) => subav && subav.value && subav.label)
+                                                      .map((subav: any) => {
+                                                        const getSubPriceDisplay = () => {
+                                                          if (!subav.priceMultiplier || subav.priceMultiplier === 1 || !selectedProduct) return null;
+                                                          const basePrice = selectedProduct.basePrice || 0;
+                                                          const pricePerUnit = basePrice * (subav.priceMultiplier - 1);
+                                                          if (Math.abs(pricePerUnit) < 0.01) return null;
+                                                          return `+₹${pricePerUnit.toFixed(2)}/unit`;
+                                                        };
+                                                        
+                                                        const isSubSelected = selectedDynamicAttributes[`${attrType._id}_sub`] === subav.value;
+                                                        
+                                                        return (
+                                                          <button
+                                                            key={subav.value}
+                                                            onClick={() => {
+                                                              setSelectedDynamicAttributes({
+                                                                ...selectedDynamicAttributes,
+                                                                [`${attrType._id}_sub`]: subav.value
+                                                              });
+                                                            }}
+                                                            className={`p-3 rounded-lg border text-left transition-all duration-200 relative ${
+                                                              isSubSelected
+                                                                ? "border-cream-700 bg-cream-100 text-cream-900 ring-1 ring-cream-700"
+                                                                : "border-cream-200 text-cream-600 hover:border-cream-400 hover:bg-cream-50"
+                                                            }`}
+                                                          >
+                                                            {isSubSelected && (
+                                                              <div className="absolute top-2 right-2">
+                                                                <Check size={16} className="text-cream-900" />
+                                                              </div>
+                                                            )}
+                                                            {subav.image && (
+                                                              <div className="mb-2">
+                                                                <img 
+                                                                  src={subav.image} 
+                                                                  alt={subav.label} 
+                                                                  className="w-full h-24 object-cover rounded-lg border border-cream-200"
+                                                                />
+                                                              </div>
+                                                            )}
+                                                            <div className="font-semibold text-xs">{subav.label}</div>
+                                                            {getSubPriceDisplay() && (
+                                                              <div className="text-xs text-cream-600 mt-1">
+                                                                {getSubPriceDisplay()}
+                                                              </div>
+                                                            )}
+                                                          </button>
+                                                        );
+                                                      })}
                                                   </div>
-                                                )}
-                                                {av.image && (
-                                                  <div className="mb-2">
-                                                    <img 
-                                                      src={av.image} 
-                                                      alt={av.label} 
-                                                      className="w-full h-32 object-cover rounded-lg border border-cream-200"
-                                                    />
-                                                  </div>
-                                                )}
-                                                <div className="font-bold text-sm">{av.label}</div>
-                                                {getPriceDisplay() && (
-                                                  <div className="text-xs text-cream-600 mt-1">
-                                                    {getPriceDisplay()}
-                                                  </div>
-                                                )}
-                                              </button>
-                                            );
-                                          })
-                                          )}
-                                        </div>
+                                                </div>
+                                              );
+                                            }
+                                            return null;
+                                          })()}
+                                        </>
                                       )}
                                       
                                       {attrType.inputStyle === 'CHECKBOX' && (

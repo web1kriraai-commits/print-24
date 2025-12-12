@@ -394,7 +394,8 @@ const Upload: React.FC = () => {
 
       xhr.open("POST", `${API_BASE_URL_WITH_API}/upload`);
 
-      // Add authorization header if token exists
+      // Add headers
+      xhr.setRequestHeader("ngrok-skip-browser-warning", "true");
       if (token) {
         xhr.setRequestHeader("Authorization", `Bearer ${token}`);
       }

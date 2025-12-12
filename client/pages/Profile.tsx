@@ -560,6 +560,7 @@ const Profile: React.FC = () => {
     return {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
+      "ngrok-skip-browser-warning": "true",
     };
   };
 

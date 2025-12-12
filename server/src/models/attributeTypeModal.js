@@ -86,6 +86,14 @@ const AttributeTypeSchema = new mongoose.Schema(
         priceMultiplier: Number, // Price multiplier for this value (optional, only if isPricingAttribute is true)
         description: String, // Optional description for this value
         image: String, // Optional image URL for this value
+        // Subattributes for this option (e.g., if option is "A", subattributes could be "A1", "A2", "A3")
+        subattributes: [{
+          value: String, // The subattribute value (e.g., "A1")
+          label: String, // Display label (e.g., "A1")
+          priceMultiplier: Number, // Price multiplier for this subattribute (optional)
+          description: String, // Optional description for this subattribute
+          image: String, // Optional image URL for this subattribute
+        }],
       },
     ],
 

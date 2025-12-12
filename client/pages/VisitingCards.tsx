@@ -111,6 +111,7 @@ const VisitingCards: React.FC = () => {
               method: "GET",
               headers: {
                 Accept: "application/json",
+                "ngrok-skip-browser-warning": "true",
               },
             });
 
@@ -196,6 +197,7 @@ const VisitingCards: React.FC = () => {
                     method: "GET",
                     headers: {
                       Accept: "application/json",
+                      "ngrok-skip-browser-warning": "true",
                     },
                   });
                   
@@ -242,6 +244,7 @@ const VisitingCards: React.FC = () => {
               method: "GET",
               headers: {
                 Accept: "application/json",
+                "ngrok-skip-browser-warning": "true",
               },
             });
 
@@ -401,6 +404,7 @@ const VisitingCards: React.FC = () => {
                   method: "GET",
                   headers: {
                     Accept: "application/json",
+                    "ngrok-skip-browser-warning": "true",
                   },
                 });
                 
@@ -445,6 +449,7 @@ const VisitingCards: React.FC = () => {
                 method: "GET",
                 headers: {
                   Accept: "application/json",
+                  "ngrok-skip-browser-warning": "true",
                 },
               });
               
@@ -486,6 +491,7 @@ const VisitingCards: React.FC = () => {
                 method: "GET",
                 headers: {
                   Accept: "application/json",
+                  "ngrok-skip-browser-warning": "true",
                 },
               });
               
@@ -514,12 +520,13 @@ const VisitingCards: React.FC = () => {
                 try {
                   // First, try fetching from subcategories list for the category
                   const subcategoriesUrl = `${API_BASE_URL}/subcategories/category/${categoryId}`;
-                  const subcategoriesResponse = await fetch(subcategoriesUrl, {
-                    method: "GET",
-                    headers: {
-                      Accept: "application/json",
-                    },
-                  });
+              const subcategoriesResponse = await fetch(subcategoriesUrl, {
+                method: "GET",
+                headers: {
+                  Accept: "application/json",
+                  "ngrok-skip-browser-warning": "true",
+                },
+              });
                   
                   if (subcategoriesResponse.ok) {
                     const subcategoriesData = await handleNgrokResponse(subcategoriesResponse);
@@ -550,6 +557,7 @@ const VisitingCards: React.FC = () => {
                       method: "GET",
                       headers: {
                         Accept: "application/json",
+                        "ngrok-skip-browser-warning": "true",
                       },
                     });
                     
@@ -609,6 +617,7 @@ const VisitingCards: React.FC = () => {
                   method: "GET",
                   headers: {
                     Accept: "application/json",
+                    "ngrok-skip-browser-warning": "true",
                   },
                 });
               } else {
@@ -621,6 +630,7 @@ const VisitingCards: React.FC = () => {
                 method: "GET",
                 headers: {
                   Accept: "application/json",
+                  "ngrok-skip-browser-warning": "true",
                 },
               });
             } else if (categoryId && /^[0-9a-fA-F]{24}$/.test(categoryId)) {
@@ -630,6 +640,7 @@ const VisitingCards: React.FC = () => {
                 method: "GET",
                 headers: {
                   Accept: "application/json",
+                  "ngrok-skip-browser-warning": "true",
                 },
               });
             } else {
@@ -693,6 +704,7 @@ const VisitingCards: React.FC = () => {
                   method: "GET",
                   headers: {
                     Accept: "application/json",
+                    "ngrok-skip-browser-warning": "true",
                   },
                 });
                 if (categoryResponse.ok) {
@@ -783,6 +795,7 @@ const VisitingCards: React.FC = () => {
             method: "GET",
             headers: {
               Accept: "application/json",
+              "ngrok-skip-browser-warning": "true",
             },
           });
 
