@@ -1,4 +1,5 @@
 import AttributeType from "../models/attributeTypeModal.js";
+import { handleMongoError } from "../utils/errorHandler.js";
 
 // Create a new attribute type
 export const createAttributeType = async (req, res) => {
@@ -128,8 +129,11 @@ export const createAttributeType = async (req, res) => {
       data: attributeType,
     });
   } catch (err) {
-    console.log("ATTRIBUTE TYPE CREATE ERROR ===>", err);
-    return res.status(500).json({ error: err.message });
+    const errorInfo = handleMongoError(err, "CREATE ATTRIBUTE TYPE");
+    return res.status(errorInfo.statusCode).json({ 
+      success: false,
+      error: errorInfo.message 
+    });
   }
 };
 
@@ -169,8 +173,11 @@ export const getAllAttributeTypes = async (req, res) => {
       data: attributeTypes,
     });
   } catch (err) {
-    console.log("GET ATTRIBUTE TYPES ERROR ===>", err);
-    return res.status(500).json({ error: err.message });
+    const errorInfo = handleMongoError(err, "GET ATTRIBUTE TYPES");
+    return res.status(errorInfo.statusCode).json({ 
+      success: false,
+      error: errorInfo.message 
+    });
   }
 };
 
@@ -205,8 +212,11 @@ export const getUnusedAttributeTypes = async (req, res) => {
       data: unusedAttributeTypes,
     });
   } catch (err) {
-    console.log("GET UNUSED ATTRIBUTE TYPES ERROR ===>", err);
-    return res.status(500).json({ error: err.message });
+    const errorInfo = handleMongoError(err, "GET UNUSED ATTRIBUTE TYPES");
+    return res.status(errorInfo.statusCode).json({ 
+      success: false,
+      error: errorInfo.message 
+    });
   }
 };
 
@@ -227,8 +237,11 @@ export const getSingleAttributeType = async (req, res) => {
       data: attributeType,
     });
   } catch (err) {
-    console.log("GET ATTRIBUTE TYPE ERROR ===>", err);
-    return res.status(500).json({ error: err.message });
+    const errorInfo = handleMongoError(err, "GET ATTRIBUTE TYPE");
+    return res.status(errorInfo.statusCode).json({ 
+      success: false,
+      error: errorInfo.message 
+    });
   }
 };
 
@@ -343,8 +356,11 @@ export const updateAttributeType = async (req, res) => {
       data: updatedAttributeType,
     });
   } catch (err) {
-    console.log("UPDATE ATTRIBUTE TYPE ERROR ===>", err);
-    return res.status(500).json({ error: err.message });
+    const errorInfo = handleMongoError(err, "UPDATE ATTRIBUTE TYPE");
+    return res.status(errorInfo.statusCode).json({ 
+      success: false,
+      error: errorInfo.message 
+    });
   }
 };
 
@@ -411,8 +427,11 @@ export const deleteAttributeType = async (req, res) => {
       message: "Attribute type deleted successfully",
     });
   } catch (err) {
-    console.log("DELETE ATTRIBUTE TYPE ERROR ===>", err);
-    return res.status(500).json({ error: err.message });
+    const errorInfo = handleMongoError(err, "DELETE ATTRIBUTE TYPE");
+    return res.status(errorInfo.statusCode).json({ 
+      success: false,
+      error: errorInfo.message 
+    });
   }
 };
 

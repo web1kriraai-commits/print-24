@@ -3,6 +3,7 @@ import Category from "../models/categoryModal.js";
 import SubCategory from "../models/subcategoryModal.js";
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
+import { handleMongoError } from "../utils/errorHandler.js";
 
 export const createProduct = async (req, res) => {
   try {
@@ -133,7 +134,10 @@ export const createProduct = async (req, res) => {
             parsedFilters.textureTypePrices = [];
           }
           
-          console.log("Parsed filters with prices (create):", JSON.stringify(parsedFilters, null, 2));
+          // Only log in development mode to reduce noise
+          if (process.env.NODE_ENV === 'development') {
+            console.log("Parsed filters with prices (create):", JSON.stringify(parsedFilters, null, 2));
+          }
         }
       } catch (err) {
         return res.status(400).json({ error: "Invalid JSON in filters" });
@@ -205,7 +209,10 @@ export const createProduct = async (req, res) => {
       }
     }
     
-    console.log("Parsed dynamicAttributes for product creation:", JSON.stringify(parsedDynamicAttributes, null, 2));
+    // Only log in development mode to reduce noise
+    if (process.env.NODE_ENV === 'development') {
+      console.log("Parsed dynamicAttributes for product creation:", JSON.stringify(parsedDynamicAttributes, null, 2));
+    }
 
     // Parse quantityDiscounts JSON
     let parsedQuantityDiscounts = [];
@@ -246,7 +253,10 @@ export const createProduct = async (req, res) => {
           parsedProductionSequence = [];
         }
       } catch (err) {
-        console.log("Error parsing productionSequence:", err);
+        // Only log in development mode
+        if (process.env.NODE_ENV === 'development') {
+          console.log("Error parsing productionSequence:", err);
+        }
         parsedProductionSequence = [];
       }
     }
@@ -309,16 +319,19 @@ export const createProduct = async (req, res) => {
         select: "_id attributeName inputStyle primaryEffectType isPricingAttribute attributeValues defaultValue isRequired isFilterable displayOrder"
       });
 
-    console.log("Product created with subcategory ID:", subcategory);
-    console.log("Populated product subcategory:", populatedProduct?.subcategory);
-    console.log("Product created with dynamicAttributes count:", populatedProduct?.dynamicAttributes?.length || 0);
-    if (populatedProduct?.dynamicAttributes && populatedProduct.dynamicAttributes.length > 0) {
-      console.log("Dynamic attributes details:", populatedProduct.dynamicAttributes.map((da) => ({
-        attributeTypeId: typeof da.attributeType === 'object' ? da.attributeType?._id : da.attributeType,
-        attributeName: typeof da.attributeType === 'object' ? da.attributeType?.attributeName : 'N/A',
-        isEnabled: da.isEnabled,
-        isRequired: da.isRequired
-      })));
+    // Only log in development mode to reduce noise
+    if (process.env.NODE_ENV === 'development') {
+      console.log("Product created with subcategory ID:", subcategory);
+      console.log("Populated product subcategory:", populatedProduct?.subcategory);
+      console.log("Product created with dynamicAttributes count:", populatedProduct?.dynamicAttributes?.length || 0);
+      if (populatedProduct?.dynamicAttributes && populatedProduct.dynamicAttributes.length > 0) {
+        console.log("Dynamic attributes details:", populatedProduct.dynamicAttributes.map((da) => ({
+          attributeTypeId: typeof da.attributeType === 'object' ? da.attributeType?._id : da.attributeType,
+          attributeName: typeof da.attributeType === 'object' ? da.attributeType?.attributeName : 'N/A',
+          isEnabled: da.isEnabled,
+          isRequired: da.isRequired
+        })));
+      }
     }
 
     return res.json({
@@ -327,8 +340,11 @@ export const createProduct = async (req, res) => {
       data: populatedProduct || data,
     });
   } catch (err) {
-    console.log("PRODUCT ERROR ===>", err);
-    return res.status(500).json({ error: err.message });
+    const errorInfo = handleMongoError(err, "CREATE PRODUCT");
+    return res.status(errorInfo.statusCode).json({ 
+      success: false,
+      error: errorInfo.message 
+    });
   }
 };
 
@@ -360,11 +376,17 @@ export const getAllProducts = async (req, res) => {
       })
       .sort({ createdAt: -1 });
     
-    console.log(`Fetched ${list.length} product(s) total`);
+    // Only log in development mode to reduce noise
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Fetched ${list.length} product(s) total`);
+    }
     res.json(list);
   } catch (err) {
-    console.error("Error fetching all products:", err);
-    res.status(500).json({ error: err.message || "Failed to fetch products" });
+    const errorInfo = handleMongoError(err, "GET ALL PRODUCTS");
+    return res.status(errorInfo.statusCode).json({ 
+      success: false,
+      error: errorInfo.message 
+    });
   }
 };
 
@@ -385,7 +407,10 @@ export const getSingleProduct = async (req, res) => {
       });
     }
 
-    console.log("Fetching product with ID:", productId);
+    // Only log in development mode
+    if (process.env.NODE_ENV === 'development') {
+      console.log("Fetching product with ID:", productId);
+    }
 
     const item = await Product.findById(productId)
       .populate({
@@ -420,14 +445,20 @@ export const getSingleProduct = async (req, res) => {
       return res.status(404).json({ error: "Product not found" });
     }
 
-    console.log("Product found:", item.name);
+    // Only log in development mode
+    if (process.env.NODE_ENV === 'development') {
+      console.log("Product found:", item.name);
+    }
     res.json(item);
   } catch (err) {
-    console.error("Error fetching product:", err);
     if (err.name === 'CastError') {
       return res.status(400).json({ error: "Invalid product ID format" });
     }
-    res.status(500).json({ error: err.message || "Failed to fetch product" });
+    const errorInfo = handleMongoError(err, "GET PRODUCT");
+    return res.status(errorInfo.statusCode).json({ 
+      success: false,
+      error: errorInfo.message 
+    });
   }
 };
 
@@ -571,7 +602,10 @@ export const getProductsBySubcategory = async (req, res) => {
       subcategoryId = subcategory._id.toString();
     }
 
-    console.log("Fetching products for subcategory ID:", subcategoryId);
+    // Only log in development mode
+    if (process.env.NODE_ENV === 'development') {
+      console.log("Fetching products for subcategory ID:", subcategoryId);
+    }
 
     // First priority: Find products where subcategory matches the provided ID
     let list = await Product.find({
@@ -601,7 +635,10 @@ export const getProductsBySubcategory = async (req, res) => {
     })
     .sort({ createdAt: -1 });
 
-    console.log(`Found ${list.length} product(s) with subcategory ${subcategoryId}`);
+    // Only log in development mode
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Found ${list.length} product(s) with subcategory ${subcategoryId}`);
+    }
 
     // If no products found with subcategory, fall back to category products
     if (list.length === 0) {
@@ -614,7 +651,10 @@ export const getProductsBySubcategory = async (req, res) => {
           ? subcategory.category._id 
           : subcategory.category;
         
-        console.log(`No products found with subcategory, falling back to category ${categoryId}`);
+        // Only log in development mode
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`No products found with subcategory, falling back to category ${categoryId}`);
+        }
         
         // Find products directly under the parent category
         list = await Product.find({
@@ -834,7 +874,10 @@ export const updateProduct = async (req, res) => {
       }
     }
     
-    console.log("Parsed dynamicAttributes for product update:", JSON.stringify(parsedDynamicAttributes, null, 2));
+    // Only log in development mode to reduce noise
+    if (process.env.NODE_ENV === 'development') {
+      console.log("Parsed dynamicAttributes for product update:", JSON.stringify(parsedDynamicAttributes, null, 2));
+    }
 
     // Parse quantityDiscounts JSON
     let parsedQuantityDiscounts = product.quantityDiscounts || [];
@@ -875,7 +918,10 @@ export const updateProduct = async (req, res) => {
           parsedProductionSequence = [];
         }
       } catch (err) {
-        console.log("Error parsing productionSequence:", err);
+        // Only log in development mode
+        if (process.env.NODE_ENV === 'development') {
+          console.log("Error parsing productionSequence:", err);
+        }
         parsedProductionSequence = product.productionSequence || [];
       }
     }

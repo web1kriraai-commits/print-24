@@ -27,7 +27,33 @@ if (existsSync(clientNodeModules)) {
 }
 
 // Load .env file from server folder (one level up from src)
-dotenv.config({ path: join(__dirname, "../.env") });
+dotenv.config({ path: join(__dirname, "../.env"), quiet: true });
+
+// ============================================
+// GLOBAL ERROR HANDLERS (MUST BE FIRST)
+// ============================================
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ UNHANDLED PROMISE REJECTION:', reason);
+  console.error('Promise:', promise);
+  // Don't exit - log and continue
+  // This prevents server crashes from unhandled async errors
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('❌ UNCAUGHT EXCEPTION:', error);
+  console.error('Stack:', error.stack);
+  // For critical errors, we might want to exit, but log first
+  // Don't exit immediately - let the error be logged
+});
+
+// Handle warnings
+process.on('warning', (warning) => {
+  console.warn('⚠️ WARNING:', warning.name);
+  console.warn('Message:', warning.message);
+  console.warn('Stack:', warning.stack);
+});
 
 const app = express();
 
@@ -100,32 +126,36 @@ const clientDistPath = join(__dirname, "../../client/dist");
 const clientDistPathResolved = resolve(clientDistPath);
 console.log(`[SSR] Client dist path: ${clientDistPathResolved}`);
 
-// Verify dist folder exists
+// Verify dist folder exists (warn but don't exit)
 if (!existsSync(clientDistPath)) {
-  console.error(`[SSR] ERROR: Client dist folder does not exist at: ${clientDistPathResolved}`);
+  console.error(`[SSR] ⚠️ WARNING: Client dist folder does not exist at: ${clientDistPathResolved}`);
   console.error(`[SSR] Please run 'npm run build' in the client folder first!`);
   console.error(`[SSR] Command: cd ../client && npm run build`);
-  process.exit(1);
+  console.error(`[SSR] Server will continue but SSR will not work.`);
 } else {
   console.log(`[SSR] ✅ Client dist folder found at: ${clientDistPathResolved}`);
 
   // Verify index.html exists in dist
   const distIndexPath = join(clientDistPath, "index.html");
   if (!existsSync(distIndexPath)) {
-    console.error(`[SSR] ERROR: index.html not found in dist folder at: ${distIndexPath}`);
+    console.error(`[SSR] ⚠️ WARNING: index.html not found in dist folder at: ${distIndexPath}`);
     console.error(`[SSR] Please run 'npm run build' in the client folder first!`);
     console.error(`[SSR] Command: cd ../client && npm run build`);
-    process.exit(1);
+    console.error(`[SSR] Server will continue but SSR will not work.`);
   } else {
     // Quick check: read a sample to verify it's the production build
-    const sample = readFileSync(distIndexPath, "utf-8").substring(0, 500);
-    if (sample.includes("@react-refresh") || sample.includes("@vite/client") || sample.includes("index.tsx")) {
-      console.error(`[SSR] ❌ ERROR: dist/index.html contains dev scripts!`);
-      console.error(`[SSR] This means the build is incorrect. Please rebuild with 'npm run build'`);
-      console.error(`[SSR] Sample: ${sample}`);
-      process.exit(1);
-    } else {
-      console.log(`[SSR] ✅ dist/index.html is clean (production build)`);
+    try {
+      const sample = readFileSync(distIndexPath, "utf-8").substring(0, 500);
+      if (sample.includes("@react-refresh") || sample.includes("@vite/client") || sample.includes("index.tsx")) {
+        console.error(`[SSR] ⚠️ WARNING: dist/index.html contains dev scripts!`);
+        console.error(`[SSR] This means the build is incorrect. Please rebuild with 'npm run build'`);
+        console.error(`[SSR] Server will continue but SSR may not work correctly.`);
+      } else {
+        console.log(`[SSR] ✅ dist/index.html is clean (production build)`);
+      }
+    } catch (err) {
+      console.error(`[SSR] ⚠️ WARNING: Could not read index.html:`, err.message);
+      console.error(`[SSR] Server will continue but SSR may not work.`);
     }
   }
 }
@@ -285,7 +315,10 @@ app.use(async (req, res, next) => {
       try {
         appHtml = ssrRender(req.url);
         if (appHtml && appHtml.length > 0) {
-          console.log(`[SSR] ✅ Rendered ${appHtml.length} chars for: ${req.url}`);
+          // Only log SSR details in development mode to reduce noise
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[SSR] ✅ Rendered ${appHtml.length} chars for: ${req.url}`);
+          }
 
           // CRITICAL: Clean up React Router resource hints (preload links) from rendered HTML
           // React Router injects <link rel="preload"> tags which should not be in the root div
@@ -297,7 +330,10 @@ app.use(async (req, res, next) => {
           // Also remove any other link tags that shouldn't be in body
           appHtml = appHtml.replace(/<link[^>]*>/gi, '');
 
-          console.log(`[SSR] ✅ Cleaned appHtml, new length: ${appHtml.length} chars`);
+          // Only log SSR details in development mode
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[SSR] ✅ Cleaned appHtml, new length: ${appHtml.length} chars`);
+          }
         } else {
           console.warn(`[SSR] ⚠️ Render returned empty string for: ${req.url}`);
           appHtml = '<div><h1>Loading...</h1></div>';
@@ -332,19 +368,25 @@ app.use(async (req, res, next) => {
       // Method 2: Replace empty root div
       else if (template.includes('<div id="root"></div>')) {
         html = template.replace('<div id="root"></div>', `<div id="root">${appHtml}</div>`);
-        console.log(`[SSR] ✅ Replaced empty <div id="root"> for: ${req.url}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[SSR] ✅ Replaced empty <div id="root"> for: ${req.url}`);
+        }
       }
       // Method 3: Replace root div with any content (including placeholder)
       else if (template.includes('<div id="root">')) {
         // Use regex to replace everything between <div id="root"> and </div>
         // This handles cases where there might be whitespace or other content
         html = template.replace(/<div id="root">[\s\S]*?<\/div>/, `<div id="root">${appHtml}</div>`);
-        console.log(`[SSR] ✅ Replaced <div id="root"> content for: ${req.url}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[SSR] ✅ Replaced <div id="root"> content for: ${req.url}`);
+        }
       }
       // Method 4: Insert before closing body tag as last resort
       else {
         html = template.replace('</body>', `${appHtml}</body>`);
-        console.log(`[SSR] ✅ Inserted HTML before </body> for: ${req.url}`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[SSR] ✅ Inserted HTML before </body> for: ${req.url}`);
+        }
       }
 
       // CRITICAL: Verify replacement worked - if placeholder still exists, force replace
@@ -424,6 +466,38 @@ app.use(async (req, res, next) => {
 
 // Static files are already served above, before SSR middleware
 
+// ============================================
+// EXPRESS ERROR HANDLING MIDDLEWARE
+// ============================================
+// 404 handler for unmatched routes
+app.use((req, res, next) => {
+  // Only handle 404 for API routes, SSR will handle page routes
+  if (req.path.startsWith('/api')) {
+    res.status(404).json({ 
+      success: false, 
+      message: `API route not found: ${req.method} ${req.path}` 
+    });
+  } else {
+    next(); // Let SSR handle it
+  }
+});
+
+// Global error handler middleware (must be last)
+app.use((err, req, res, next) => {
+  console.error('❌ Express Error:', err.message);
+  console.error('Stack:', err.stack);
+  console.error('Request:', req.method, req.path);
+  
+  // Don't send error details in production
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'Internal server error',
+    ...(isDevelopment && { stack: err.stack })
+  });
+});
+
 // DB + SERVER
 if (!process.env.MONGO_URI) {
   console.error("❌ ERROR: MONGO_URI environment variable is not set!");
@@ -436,7 +510,58 @@ async function startServer() {
   // Load SSR module first
   await loadSSRModule();
 
-  // Connect to MongoDB
+  // Start HTTP server first (regardless of MongoDB connection)
+  const port = process.env.PORT || 5000;
+  let server;
+  
+  try {
+    server = app.listen(port, () => {
+      console.log(`========================================`);
+      console.log(`🚀 Backend Server running on port ${port}`);
+      console.log(`📦 SSR Enabled - Access: http://localhost:${port}`);
+      console.log(`⚠️  DO NOT use http://localhost:3000 (Vite dev server)`);
+      console.log(`========================================`);
+    });
+    
+    // Handle server errors (e.g., port already in use)
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${port} is already in use!`);
+        console.error(`Please either:`);
+        console.error(`  1. Stop the other process using port ${port}`);
+        console.error(`  2. Set a different PORT in your .env file`);
+        console.error(`  3. Kill the process: netstat -ano | findstr :${port}`);
+      } else {
+        console.error('❌ Server error:', err);
+      }
+      // Exit on port conflict - this is a critical error
+      process.exit(1);
+    });
+    
+    // Graceful shutdown
+    const gracefulShutdown = (signal) => {
+      console.log(`\n${signal} received. Shutting down gracefully...`);
+      server.close(() => {
+        console.log('HTTP server closed.');
+        if (mongoose.connection.readyState === 1) {
+          mongoose.connection.close(false, () => {
+            console.log('MongoDB connection closed.');
+            process.exit(0);
+          });
+        } else {
+          process.exit(0);
+        }
+      });
+    };
+    
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  } catch (serverErr) {
+    console.error('❌ Failed to start HTTP server:', serverErr);
+    process.exit(1);
+  }
+
+  // Connect to MongoDB (non-blocking - server already running)
   mongoose
     .connect(process.env.MONGO_URI, {
       serverSelectionTimeoutMS: 30000, // Timeout after 30s (increased from 5s)
@@ -449,13 +574,31 @@ async function startServer() {
     })
     .then(() => {
       console.log("✅ MongoDB connected successfully");
-      const port = process.env.PORT || 5000;
-      app.listen(port, () => {
-        console.log(`========================================`);
-        console.log(`🚀 Backend Server running on port ${port}`);
-        console.log(`📦 SSR Enabled - Access: http://localhost:${port}`);
-        console.log(`⚠️  DO NOT use http://localhost:3000 (Vite dev server)`);
-        console.log(`========================================`);
+      
+      // Handle MongoDB connection events
+      mongoose.connection.on('error', (err) => {
+        // Suppress verbose stack traces for connection errors
+        const isConnectionError = 
+          err.name === 'MongoNetworkError' ||
+          err.name === 'MongoServerSelectionError' ||
+          err.name === 'MongoTimeoutError' ||
+          err.message?.includes('ETIMEDOUT') ||
+          err.message?.includes('ECONNREFUSED');
+        
+        if (isConnectionError) {
+          console.warn('⚠️ MongoDB connection issue:', err.message || err.name);
+        } else {
+          console.error('❌ MongoDB error:', err.message || err.name);
+        }
+        // Don't exit - try to reconnect
+      });
+      
+      mongoose.connection.on('disconnected', () => {
+        console.warn('⚠️ MongoDB disconnected. Attempting to reconnect...');
+      });
+      
+      mongoose.connection.on('reconnected', () => {
+        console.log('✅ MongoDB reconnected');
       });
     })
     .catch((err) => {
@@ -501,12 +644,22 @@ async function startServer() {
       console.error("   4. Verify database user credentials are correct");
       console.error("==========================================");
       console.error("\nFull error details:", err.message);
-      process.exit(1);
+      console.error("\n⚠️ Server is running but MongoDB is not connected.");
+      console.error("⚠️ API endpoints requiring database will fail.");
+      console.error("⚠️ Please fix the MongoDB connection - the server will continue running.");
+      console.error("==========================================");
     });
 }
 
 // Start the server
 startServer().catch((err) => {
   console.error("❌ Failed to start server:", err);
-  process.exit(1);
+  console.error("Stack:", err.stack);
+  // Only exit on critical startup errors
+  // For non-critical errors, log and continue
+  if (err.code === 'EADDRINUSE' || err.message.includes('MONGO_URI')) {
+    process.exit(1);
+  } else {
+    console.error("⚠️ Non-critical error - server may continue with limited functionality");
+  }
 });
