@@ -15,6 +15,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import Reviews from './pages/Reviews';
 import Profile from './pages/Profile';
 import OrderDetails from './pages/OrderDetails';
+import MyOrders from './pages/MyOrders';
 import DepartmentPortal from './pages/DepartmentPortal';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 
@@ -42,6 +43,8 @@ export const routes = [
       { path: 'login', element: <Login />, errorElement: <ErrorBoundary /> },
       { path: 'signup', element: <SignUp />, errorElement: <ErrorBoundary /> },
       { path: 'profile', element: <Profile />, errorElement: <ErrorBoundary /> },
+      { path: 'my-orders', element: <MyOrders />, errorElement: <ErrorBoundary /> },
+      { path: 'orders/:orderId', element: <OrderDetails />, errorElement: <ErrorBoundary /> },
       { path: 'order/:orderId', element: <OrderDetails />, errorElement: <ErrorBoundary /> },
       { path: 'admin/dashboard', element: <AdminDashboard />, errorElement: <ErrorBoundary /> },
       { path: 'employee/dashboard', element: <EmployeeDashboard />, errorElement: <ErrorBoundary /> },
