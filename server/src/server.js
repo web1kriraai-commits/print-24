@@ -9,6 +9,7 @@ import { createRequire } from "module";
 import authRoutes from "./routes/authRoutes.js";
 import apiRoutes from "./routes/index.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
+import timelineRoutes from "./routes/timeline.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -20,7 +21,7 @@ const require = createRequire(import.meta.url);
 // Add client's node_modules to module resolution path
 if (existsSync(clientNodeModules)) {
   // This helps resolve React when SSR module is imported
-  process.env.NODE_PATH = process.env.NODE_PATH 
+  process.env.NODE_PATH = process.env.NODE_PATH
     ? `${process.env.NODE_PATH}:${clientNodeModules}`
     : clientNodeModules;
 }
@@ -39,7 +40,7 @@ app.use(
     origin: function (origin, callback) {
       // Allow requests with no origin (like mobile apps, Postman, or same-origin requests)
       if (!origin) return callback(null, true);
-      
+
       // List of allowed origins
       const allowedOrigins = [
         "http://localhost:3000",
@@ -50,11 +51,11 @@ app.use(
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173"
       ];
-      
+
       // Allow if origin is in the list or if it's a localhost/127.0.0.1 origin
-      if (allowedOrigins.includes(origin) || 
-          origin.startsWith("http://localhost:") || 
-          origin.startsWith("http://127.0.0.1:")) {
+      if (allowedOrigins.includes(origin) ||
+        origin.startsWith("http://localhost:") ||
+        origin.startsWith("http://127.0.0.1:")) {
         callback(null, true);
       } else {
         // For development, allow all origins
@@ -89,6 +90,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use("/api/auth", authRoutes);
 app.use("/api", apiRoutes);
 app.use("/api", uploadRoutes);
+app.use("/api/timeline", timelineRoutes);
 
 // Serve static files from client dist
 // From server/src/server.js, go up 2 levels to print24-ssr, then into client/dist
@@ -104,14 +106,14 @@ if (!existsSync(clientDistPath)) {
   process.exit(1);
 } else {
   console.log(`[SSR] ✅ Client dist folder found at: ${clientDistPathResolved}`);
-  
-    // Verify index.html exists in dist
-    const distIndexPath = join(clientDistPath, "index.html");
-    if (!existsSync(distIndexPath)) {
-      console.error(`[SSR] ERROR: index.html not found in dist folder at: ${distIndexPath}`);
-      console.error(`[SSR] Please run 'npm run build' in the client folder first!`);
-      console.error(`[SSR] Command: cd ../client && npm run build`);
-      process.exit(1);
+
+  // Verify index.html exists in dist
+  const distIndexPath = join(clientDistPath, "index.html");
+  if (!existsSync(distIndexPath)) {
+    console.error(`[SSR] ERROR: index.html not found in dist folder at: ${distIndexPath}`);
+    console.error(`[SSR] Please run 'npm run build' in the client folder first!`);
+    console.error(`[SSR] Command: cd ../client && npm run build`);
+    process.exit(1);
   } else {
     // Quick check: read a sample to verify it's the production build
     const sample = readFileSync(distIndexPath, "utf-8").substring(0, 500);
@@ -140,12 +142,12 @@ app.get("/index.css", (req, res) => {
 // Files in public/ are served at root path (e.g., /logo.svg, not /public/logo.svg)
 const clientPublicPath = join(__dirname, "../../client/public");
 if (existsSync(clientPublicPath)) {
-  app.use(express.static(clientPublicPath, { 
+  app.use(express.static(clientPublicPath, {
     index: false,
     dotfiles: 'ignore',
   }));
   console.log(`[Server] ✅ Serving static files from: ${clientPublicPath}`);
-  
+
   // Handle /public/* requests and serve from public folder (for browser compatibility)
   // Use middleware approach instead of route pattern to handle all /public/* requests
   app.use("/public", (req, res, next) => {
@@ -228,22 +230,22 @@ app.use(async (req, res, next) => {
   if (req.path.startsWith("/api")) {
     return next();
   }
-  
+
   // Skip static assets (already served above)
-  if (req.path.startsWith("/assets") || 
-      req.path === "/client.js" ||
-      /\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/i.test(req.path)) {
+  if (req.path.startsWith("/assets") ||
+    req.path === "/client.js" ||
+    /\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/i.test(req.path)) {
     return next();
   }
-  
+
   // Skip well-known paths (Chrome DevTools, service workers, etc.)
   if (req.path.startsWith("/.well-known") ||
-      req.path.startsWith("/favicon.ico") ||
-      req.path.startsWith("/robots.txt") ||
-      req.path.startsWith("/sitemap.xml")) {
+    req.path.startsWith("/favicon.ico") ||
+    req.path.startsWith("/robots.txt") ||
+    req.path.startsWith("/sitemap.xml")) {
     return res.status(404).end();
   }
-  
+
   // Only handle GET requests
   if (req.method !== "GET") {
     return next();
@@ -253,28 +255,28 @@ app.use(async (req, res, next) => {
     // Read HTML template from dist folder
     const templatePath = join(clientDistPath, "index.html");
     let template = readFileSync(templatePath, "utf-8");
-    
+
     // Verify template has the placeholder (for debugging)
     if (!template.includes('<!--app-html-->') && !template.includes('<div id="root">')) {
       console.warn(`[SSR] ⚠️ Template may not have placeholder. Path: ${templatePath}`);
     }
-    
+
     // Clean up Vite build artifacts (modulepreload, asset scripts)
     template = template.replace(/<link[^>]*rel\s*=\s*["']modulepreload["'][^>]*>/gi, '');
     template = template.replace(/<script[^>]*src\s*=\s*["']\/assets\/[^"']*\.js["'][^>]*>[\s\S]*?<\/script>/gi, '');
     template = template.replace(/<script[^>]*src\s*=\s*["']\/assets\/[^"']*\.js["'][^>]*\/>/gi, '');
-    
+
     // CRITICAL: Clean up React Router resource hints (preload links) from rendered HTML
     // These should not be in the root div - they get injected by React Router
     // We'll remove them from the appHtml before injecting
-    
+
     // Ensure client.js is present (remove any existing first to avoid duplicates)
     template = template.replace(/<script[^>]*src\s*=\s*["']\/client\.js["'][^>]*>[\s\S]*?<\/script>/gi, '');
     template = template.replace(/<script[^>]*src\s*=\s*["']\/client\.js["'][^>]*\/>/gi, '');
     if (!template.includes('src="/client.js"') && !template.includes("src='/client.js'")) {
       template = template.replace('</body>', '<script type="module" src="/client.js"></script></body>');
     }
-    
+
     // Render React app
     let appHtml = "";
     if (ssrRender && typeof ssrRender === 'function') {
@@ -282,17 +284,17 @@ app.use(async (req, res, next) => {
         appHtml = ssrRender(req.url);
         if (appHtml && appHtml.length > 0) {
           console.log(`[SSR] ✅ Rendered ${appHtml.length} chars for: ${req.url}`);
-          
+
           // CRITICAL: Clean up React Router resource hints (preload links) from rendered HTML
           // React Router injects <link rel="preload"> tags which should not be in the root div
           // Remove all preload links that React Router might inject
           appHtml = appHtml.replace(/<link[^>]*rel\s*=\s*["']preload["'][^>]*>/gi, '');
           appHtml = appHtml.replace(/<link[^>]*rel\s*=\s*["']modulepreload["'][^>]*>/gi, '');
           appHtml = appHtml.replace(/<link[^>]*rel\s*=\s*["']stylesheet["'][^>]*>/gi, '');
-          
+
           // Also remove any other link tags that shouldn't be in body
           appHtml = appHtml.replace(/<link[^>]*>/gi, '');
-          
+
           console.log(`[SSR] ✅ Cleaned appHtml, new length: ${appHtml.length} chars`);
         } else {
           console.warn(`[SSR] ⚠️ Render returned empty string for: ${req.url}`);
@@ -310,21 +312,21 @@ app.use(async (req, res, next) => {
       }
       appHtml = '<div><h1>Loading...</h1></div>';
     }
-    
+
     // Replace placeholder with rendered HTML - ensure it's always replaced
     let html = template;
-    
+
     if (appHtml.length > 0) {
       // CRITICAL: Replace the placeholder with actual rendered HTML
       // The placeholder is: <!--app-html-->
       // It should be inside: <div id="root"><!--app-html--></div>
-      
+
       // Method 1: Direct placeholder replacement (most reliable)
       if (template.includes('<!--app-html-->')) {
         // Replace the placeholder with the rendered HTML
         html = template.replace('<!--app-html-->', appHtml);
         console.log(`[SSR] ✅ Replaced <!--app-html--> placeholder for: ${req.url}`);
-      } 
+      }
       // Method 2: Replace empty root div
       else if (template.includes('<div id="root"></div>')) {
         html = template.replace('<div id="root"></div>', `<div id="root">${appHtml}</div>`);
@@ -342,7 +344,7 @@ app.use(async (req, res, next) => {
         html = template.replace('</body>', `${appHtml}</body>`);
         console.log(`[SSR] ✅ Inserted HTML before </body> for: ${req.url}`);
       }
-      
+
       // CRITICAL: Verify replacement worked - if placeholder still exists, force replace
       if (html.includes('<!--app-html-->')) {
         console.error(`[SSR] ❌ ERROR: Placeholder still exists after replacement for: ${req.url}`);
@@ -352,7 +354,7 @@ app.use(async (req, res, next) => {
         html = html.replace(/<div id="root">[\s\S]*?<\/div>/, `<div id="root">${appHtml}</div>`);
         console.log(`[SSR] 🔧 Force replaced placeholder using all methods`);
       }
-      
+
       // Final verification - check if root div has content
       const rootDivMatch = html.match(/<div id="root">([\s\S]*?)<\/div>/);
       if (rootDivMatch) {
@@ -369,19 +371,19 @@ app.use(async (req, res, next) => {
     } else {
       console.warn(`[SSR] ⚠️ No HTML to inject for: ${req.url} (appHtml length: ${appHtml.length})`);
     }
-    
+
     // CRITICAL: Verify the HTML actually contains the rendered content
     // Check if root div has meaningful content (not just placeholder or empty)
-    const hasRenderedContent = html.includes('<div id="root">') && 
-                               !html.includes('<!--app-html-->') &&
-                               html.indexOf('<div id="root">') < html.indexOf('</div>');
-    
+    const hasRenderedContent = html.includes('<div id="root">') &&
+      !html.includes('<!--app-html-->') &&
+      html.indexOf('<div id="root">') < html.indexOf('</div>');
+
     if (!hasRenderedContent && appHtml.length > 0) {
       console.error(`[SSR] ❌ CRITICAL: HTML does not contain rendered content!`);
       console.error(`[SSR] Template has placeholder: ${template.includes('<!--app-html-->')}`);
       console.error(`[SSR] Final HTML has placeholder: ${html.includes('<!--app-html-->')}`);
       console.error(`[SSR] AppHtml length: ${appHtml.length}`);
-      
+
       // Emergency fallback: force inject
       const rootDivRegex = /<div id="root">[\s\S]*?<\/div>/;
       if (rootDivRegex.test(html)) {
@@ -389,14 +391,14 @@ app.use(async (req, res, next) => {
         console.log(`[SSR] 🔧 Emergency: Force injected HTML into root div`);
       }
     }
-    
+
     // Set proper headers to prevent caching and ensure correct content type
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");
     res.setHeader("X-Content-Type-Options", "nosniff");
-    
+
     // Send the response
     res.status(200).send(html);
   } catch (err) {
@@ -431,7 +433,7 @@ if (!process.env.MONGO_URI) {
 async function startServer() {
   // Load SSR module first
   await loadSSRModule();
-  
+
   // Connect to MongoDB
   mongoose
     .connect(process.env.MONGO_URI, {
@@ -454,36 +456,36 @@ async function startServer() {
     .catch((err) => {
       console.error("❌ MongoDB connection error:");
       console.error("==========================================");
-      
+
       if (err.message.includes("authentication failed") || err.message.includes("bad auth")) {
-      console.error("🔐 Authentication Error:");
-      console.error("   - Check your MongoDB username and password");
-      console.error("   - Verify your connection string includes correct credentials");
-      console.error("   - Make sure special characters in password are URL-encoded");
-    } else if (err.message.includes("IP") || err.message.includes("whitelist")) {
-      console.error("🌐 IP Whitelist Error:");
-      console.error("   - Your IP address is not whitelisted in MongoDB Atlas");
-      console.error("   - Go to MongoDB Atlas → Network Access → Add IP Address");
-      console.error("   - You can add '0.0.0.0/0' to allow all IPs (for development only)");
-    } else if (err.message.includes("ECONNREFUSED") || err.message.includes("connection")) {
-      console.error("🔌 Connection Error:");
-      console.error("   - Check your internet connection");
-      console.error("   - Verify MongoDB Atlas cluster is running");
-      console.error("   - Check if firewall is blocking the connection");
-    } else if (err.message.includes("ReplicaSetNoPrimary")) {
-      console.error("🔄 Replica Set Error:");
-      console.error("   - MongoDB cluster may be initializing or unavailable");
-      console.error("   - Wait a few minutes and try again");
-      console.error("   - Check MongoDB Atlas cluster status");
-    }
-    
-    console.error("\n📋 Connection String Format:");
-    console.error("   mongodb+srv://<username>:<password>@<cluster>.mongodb.net/<database>?retryWrites=true&w=majority");
-    console.error("\n💡 Troubleshooting Steps:");
-    console.error("   1. Verify MONGO_URI in your .env file");
-    console.error("   2. Check MongoDB Atlas dashboard for cluster status");
-    console.error("   3. Ensure your IP is whitelisted in Network Access");
-    console.error("   4. Verify database user credentials are correct");
+        console.error("🔐 Authentication Error:");
+        console.error("   - Check your MongoDB username and password");
+        console.error("   - Verify your connection string includes correct credentials");
+        console.error("   - Make sure special characters in password are URL-encoded");
+      } else if (err.message.includes("IP") || err.message.includes("whitelist")) {
+        console.error("🌐 IP Whitelist Error:");
+        console.error("   - Your IP address is not whitelisted in MongoDB Atlas");
+        console.error("   - Go to MongoDB Atlas → Network Access → Add IP Address");
+        console.error("   - You can add '0.0.0.0/0' to allow all IPs (for development only)");
+      } else if (err.message.includes("ECONNREFUSED") || err.message.includes("connection")) {
+        console.error("🔌 Connection Error:");
+        console.error("   - Check your internet connection");
+        console.error("   - Verify MongoDB Atlas cluster is running");
+        console.error("   - Check if firewall is blocking the connection");
+      } else if (err.message.includes("ReplicaSetNoPrimary")) {
+        console.error("🔄 Replica Set Error:");
+        console.error("   - MongoDB cluster may be initializing or unavailable");
+        console.error("   - Wait a few minutes and try again");
+        console.error("   - Check MongoDB Atlas cluster status");
+      }
+
+      console.error("\n📋 Connection String Format:");
+      console.error("   mongodb+srv://<username>:<password>@<cluster>.mongodb.net/<database>?retryWrites=true&w=majority");
+      console.error("\n💡 Troubleshooting Steps:");
+      console.error("   1. Verify MONGO_URI in your .env file");
+      console.error("   2. Check MongoDB Atlas dashboard for cluster status");
+      console.error("   3. Ensure your IP is whitelisted in Network Access");
+      console.error("   4. Verify database user credentials are correct");
       console.error("==========================================");
       console.error("\nFull error details:", err.message);
       process.exit(1);

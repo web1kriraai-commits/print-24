@@ -62,6 +62,12 @@ import {
   cancelOrder,
 } from "../controllers/orderController.js";
 
+/* ORDER APPROVAL CONTROLLERS */
+import {
+  approveOrderForProduction,
+  checkOrderDepartmentStatus,
+} from "../controllers/orderApprovalController.js";
+
 /* SUBCATEGORY CONTROLLERS */
 import {
   createSubCategory,
@@ -248,6 +254,21 @@ router.put(
   authMiddleware,
   adminAuth,
   updateOrderStatus
+);
+
+// New: Admin order approval route (ensures proper department assignment)
+router.post(
+  "/orders/:orderId/approve",
+  authMiddleware,
+  adminAuth,
+  approveOrderForProduction
+);
+
+// New: Diagnostic route to check why order isn't showing in employee dashboard
+router.get(
+  "/orders/:orderId/department-status",
+  authMiddleware,
+  checkOrderDepartmentStatus
 );
 
 /* =====================================

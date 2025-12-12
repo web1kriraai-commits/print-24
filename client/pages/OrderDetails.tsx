@@ -170,10 +170,10 @@ const TimelineStep: React.FC<{
       <div className="flex md:flex-col items-center gap-4 md:gap-2">
         <div
           className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all duration-300 cursor-pointer ${isCompleted
-              ? 'bg-green-500 border-green-500 text-white'
-              : isActive
-                ? 'bg-white border-orange-500 text-orange-500 shadow-[0_0_0_4px_rgba(249,115,22,0.2)]'
-                : 'bg-white border-slate-300 text-slate-300'
+            ? 'bg-green-500 border-green-500 text-white'
+            : isActive
+              ? 'bg-white border-orange-500 text-orange-500 shadow-[0_0_0_4px_rgba(249,115,22,0.2)]'
+              : 'bg-white border-slate-300 text-slate-300'
             }`}
           onMouseEnter={() => hasTimestamps && setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
@@ -257,18 +257,18 @@ const DepartmentChip: React.FC<{ status: DepartmentStatus }> = ({ status }) => {
   return (
     <div
       className={`shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg border transition-all duration-300 ${isCompleted
-          ? 'bg-green-50 border-green-200'
-          : isInProgress
-            ? 'bg-white border-orange-400 shadow-sm ring-1 ring-orange-100'
-            : 'bg-slate-50 border-slate-200 opacity-60'
+        ? 'bg-green-50 border-green-200'
+        : isInProgress
+          ? 'bg-white border-orange-400 shadow-sm ring-1 ring-orange-100'
+          : 'bg-slate-50 border-slate-200 opacity-60'
         }`}
     >
       <div
         className={`p-1.5 rounded-full ${isCompleted
-            ? 'bg-green-100 text-green-700'
-            : isInProgress
-              ? 'bg-orange-100 text-orange-700'
-              : 'bg-slate-200 text-slate-500'
+          ? 'bg-green-100 text-green-700'
+          : isInProgress
+            ? 'bg-orange-100 text-orange-700'
+            : 'bg-slate-200 text-slate-500'
           }`}
       >
         {getIcon(status.departmentName)}
@@ -587,8 +587,8 @@ const PriceBreakdownPanel: React.FC<{ order: Order }> = ({ order }) => {
               <span className="text-slate-500">Balance Due</span>
               <span
                 className={`font-bold ${order.totalPrice - (order.advancePaid || 0) > 0
-                    ? 'text-red-600'
-                    : 'text-slate-400'
+                  ? 'text-red-600'
+                  : 'text-slate-400'
                   }`}
               >
                 {formatCurrency(order.totalPrice - (order.advancePaid || 0))}
@@ -957,7 +957,7 @@ const OrderDetails: React.FC = () => {
   const productionTimeline = getProductionTimeline();
   const departmentStatuses = getDepartmentStatuses();
   const categoryName =
-    typeof order.product.subcategory === 'object'
+    typeof order.product.subcategory === 'object' && order.product.subcategory !== null
       ? order.product.subcategory.name
       : order.product.subcategory || 'N/A';
 
@@ -996,10 +996,10 @@ const OrderDetails: React.FC = () => {
                   <h1 className="text-2xl font-bold text-slate-900">{order.orderNumber}</h1>
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${order.status === 'completed'
-                        ? 'bg-green-100 text-green-700'
-                        : order.status === 'processing'
-                          ? 'bg-orange-100 text-orange-700'
-                          : 'bg-slate-100 text-slate-600'
+                      ? 'bg-green-100 text-green-700'
+                      : order.status === 'processing'
+                        ? 'bg-orange-100 text-orange-700'
+                        : 'bg-slate-100 text-slate-600'
                       }`}
                   >
                     {order.status.replace('_', ' ')}
@@ -1055,7 +1055,7 @@ const OrderDetails: React.FC = () => {
             <p className="text-slate-600 max-w-md mx-auto mb-6">
               Your order has been created but production will not start until payment is confirmed.
             </p>
-            <button className="bg-brand-600 hover:bg-brand-700 text-white px-8 py-3 rounded-xl font-semibold shadow-lg shadow-brand-500/20 transition-all">
+            <button className="bg-brand-600 hover:bg-brand-700 border-brown-200 border px-8 py-3 rounded-xl font-semibold shadow-lg shadow-brand-500/20 transition-all">
               Pay {formatCurrency(order.totalPrice)} Now
             </button>
           </div>
