@@ -439,10 +439,13 @@ async function startServer() {
   // Connect to MongoDB
   mongoose
     .connect(process.env.MONGO_URI, {
-      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+      serverSelectionTimeoutMS: 30000, // Timeout after 30s (increased from 5s)
       socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+      connectTimeoutMS: 30000, // Connection timeout
       retryWrites: true,
-      w: 'majority'
+      w: 'majority',
+      maxPoolSize: 10, // Maintain up to 10 socket connections
+      minPoolSize: 5, // Maintain at least 5 socket connections
     })
     .then(() => {
       console.log("✅ MongoDB connected successfully");
@@ -479,6 +482,14 @@ async function startServer() {
         console.error("   - MongoDB cluster may be initializing or unavailable");
         console.error("   - Wait a few minutes and try again");
         console.error("   - Check MongoDB Atlas cluster status");
+      } else if (err.message.includes("timed out") || err.message.includes("timeout")) {
+        console.error("⏱️  Connection Timeout Error:");
+        console.error("   - MongoDB server took too long to respond");
+        console.error("   - Check your internet connection");
+        console.error("   - Verify MongoDB Atlas cluster is running and accessible");
+        console.error("   - The timeout has been increased to 30 seconds");
+        console.error("   - If using MongoDB Atlas, check cluster status in dashboard");
+        console.error("   - Ensure your IP is whitelisted in Network Access");
       }
 
       console.error("\n📋 Connection String Format:");

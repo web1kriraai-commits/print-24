@@ -3153,13 +3153,63 @@ const GlossProductSelection: React.FC = () => {
                                         </div>
                                       );
                                     }
-                                  } else {
-                                    // For other input types (TEXT, NUMBER, FILE_UPLOAD), can display even with 0 values
-                                    // They don't need pre-defined options
-                                  }
-                                  
-                                  return (
-                                    <div key={attrType._id} className="mb-6 sm:mb-8">
+                                  })()}
+                                </div>
+
+                                {/* Dynamic Attributes */}
+                                {selectedProduct.dynamicAttributes && selectedProduct.dynamicAttributes.length > 0 && (
+                                  <>
+                                    {selectedProduct.dynamicAttributes
+                                      .filter((attr) => attr.isEnabled)
+                                      .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+                                      .map((attr) => {
+                                        // Handle both populated (object) and unpopulated (string ID) attributeType
+                                        let attrType = null;
+                                        if (typeof attr.attributeType === 'object' && attr.attributeType !== null) {
+                                          attrType = attr.attributeType;
+                                        } else if (typeof attr.attributeType === 'string' && attr.attributeType.trim() !== '') {
+                                          // If attributeType is just an ID string, we can't display it without fetching
+                                          // This shouldn't happen if backend populate is working, but handle gracefully
+                                          console.warn(`Attribute type not populated for attribute: ${attr.attributeType}`);
+                                          return null;
+                                        }
+
+                                        if (!attrType || !attrType._id) {
+                                          console.warn('Invalid attributeType:', attr.attributeType);
+                                          return null;
+                                        }
+
+                                        const attributeValues = attr.customValues && attr.customValues.length > 0
+                                          ? attr.customValues
+                                          : attrType.attributeValues || [];
+
+                                        // For DROPDOWN, RADIO, and POPUP input styles, we need at least 2 options to display
+                                        // For TEXT, NUMBER, FILE_UPLOAD, and other input styles, we can display even with 0 or 1 values
+                                        const requiresMultipleOptions = ['DROPDOWN', 'RADIO', 'POPUP'].includes(attrType.inputStyle);
+
+                                        if (requiresMultipleOptions) {
+                                          // For dropdown/radio/popup, need at least 2 options
+                                          if (attributeValues.length < 2) {
+                                            console.warn(`Attribute "${attrType.attributeName}" (${attrType.inputStyle}) requires at least 2 options but only has ${attributeValues.length}`);
+                                            return (
+                                              <div key={attrType._id} className="mb-6 sm:mb-8 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                                <label className="block text-xs sm:text-sm font-bold text-cream-900 mb-2 sm:mb-3 uppercase tracking-wider">
+                                                  {sectionNum++}. {attrType.attributeName}
+                                                  {attr.isRequired && <span className="text-red-500 ml-1">*</span>}
+                                                </label>
+                                                <p className="text-sm text-yellow-800">
+                                                  This attribute is not available because it requires at least 2 options. Please contact support.
+                                                </p>
+                                              </div>
+                                            );
+                                          }
+                                        } else {
+                                          // For other input types (TEXT, NUMBER, FILE_UPLOAD), can display even with 0 values
+                                          // They don't need pre-defined options
+                                        }
+                                        
+                                        return (
+                                          <div key={attrType._id} className="mb-6 sm:mb-8">
                                       <label className="block text-xs sm:text-sm font-bold text-cream-900 mb-2 sm:mb-3 uppercase tracking-wider">
                                         {sectionNum++}. {attrType.attributeName}
                                         {attr.isRequired && <span className="text-red-500 ml-1">*</span>}
@@ -3553,325 +3603,45 @@ const GlossProductSelection: React.FC = () => {
                         </>
                       );
                     })()}
-                                  {appliedDiscount !== null && appliedDiscount > 0 && (
-                                    <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg">
-                                      <p className="text-xs sm:text-sm text-green-800 font-medium">
-                                        🎉 You're saving {appliedDiscount}% on this order! (Bulk discount applied)
-                                      </p>
-                                    </div>
-                                  )}
-                                  {selectedProduct.quantityDiscounts && selectedProduct.quantityDiscounts.length > 0 && (
-                                    <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                      <p className="text-xs font-medium text-blue-900 mb-2">Available Quantity Discounts:</p>
-                                      <div className="space-y-1">
-                                        {selectedProduct.quantityDiscounts.map((discount: any, idx: number) => {
-                                          const minQty = discount.minQuantity || 0;
-                                          const maxQty = discount.maxQuantity;
-                                          const discountPct = discount.discountPercentage || 0;
-                                          const range = maxQty
-                                            ? `${minQty.toLocaleString()} - ${maxQty.toLocaleString()} units`
-                                            : `${minQty.toLocaleString()}+ units`;
-                                          return (
-                                            <p key={idx} className="text-xs text-blue-800">
-                                              • {range}: <strong>{discountPct}% off</strong>
-                                            </p>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
 
-                                        if (!attrType || !attrType._id) {
-                                          console.warn('Invalid attributeType:', attr.attributeType);
-                                          return null;
-                                        }
-
-                                        const attributeValues = attr.customValues && attr.customValues.length > 0
-                                          ? attr.customValues
-                                          : attrType.attributeValues || [];
-
-                                        // For DROPDOWN, RADIO, and POPUP input styles, we need at least 2 options to display
-                                        // For TEXT, NUMBER, FILE_UPLOAD, and other input styles, we can display even with 0 or 1 values
-                                        const requiresMultipleOptions = ['DROPDOWN', 'RADIO', 'POPUP'].includes(attrType.inputStyle);
-
-                                        if (requiresMultipleOptions) {
-                                          // For dropdown/radio/popup, need at least 2 options
-                                          if (attributeValues.length < 2) {
-                                            console.warn(`Attribute "${attrType.attributeName}" (${attrType.inputStyle}) requires at least 2 options but only has ${attributeValues.length}`);
-                                            return (
-                                              <div key={attrType._id} className="mb-6 sm:mb-8 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                                <label className="block text-xs sm:text-sm font-bold text-cream-900 mb-2 sm:mb-3 uppercase tracking-wider">
-                                                  {sectionNum++}. {attrType.attributeName}
-                                                  {attr.isRequired && <span className="text-red-500 ml-1">*</span>}
-                                                </label>
-                                                <p className="text-sm text-yellow-800">
-                                                  This attribute is not available because it requires at least 2 options. Please contact support.
-                                                </p>
-                                              </div>
-                                            );
-                                          }
-                                        } else {
-                                          // For other input types (TEXT, NUMBER, FILE_UPLOAD), can display even with 0 values
-                                          // They don't need pre-defined options
-                                        }
-
+                                {/* Discount Information */}
+                                {appliedDiscount !== null && appliedDiscount > 0 && (
+                                  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                                    <p className="text-xs sm:text-sm text-green-800 font-medium">
+                                      🎉 You're saving {appliedDiscount}% on this order! (Bulk discount applied)
+                                    </p>
+                                  </div>
+                                )}
+                                {selectedProduct.quantityDiscounts && selectedProduct.quantityDiscounts.length > 0 && (
+                                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <p className="text-xs font-medium text-blue-900 mb-2">Available Quantity Discounts:</p>
+                                    <div className="space-y-1">
+                                      {selectedProduct.quantityDiscounts.map((discount: any, idx: number) => {
+                                        const minQty = discount.minQuantity || 0;
+                                        const maxQty = discount.maxQuantity;
+                                        const discountPct = discount.discountPercentage || 0;
+                                        const range = maxQty
+                                          ? `${minQty.toLocaleString()} - ${maxQty.toLocaleString()} units`
+                                          : `${minQty.toLocaleString()}+ units`;
                                         return (
-                                          <div key={attrType._id} className="mb-6 sm:mb-8">
-                                            <label className="block text-xs sm:text-sm font-bold text-cream-900 mb-2 sm:mb-3 uppercase tracking-wider">
-                                              {sectionNum++}. {attrType.attributeName}
-                                              {attr.isRequired && <span className="text-red-500 ml-1">*</span>}
-                                            </label>
-
-                                            {(attrType.inputStyle === 'DROPDOWN' || attrType.inputStyle === 'POPUP') && (
-                                              <div data-attribute={attrType._id} data-attribute-name={attrType.attributeName}>
-                                                {attributeValues.length === 0 ? (
-                                                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                                    <p className="text-sm text-yellow-800">
-                                                      No options available for this attribute. Please contact support.
-                                                    </p>
-                                                  </div>
-                                                ) : (
-                                                  <Select
-                                                    options={attributeValues
-                                                      .filter((av: any) => av && av.value && av.label) // Filter out invalid options
-                                                      .map((av: any) => ({
-                                                        value: av.value,
-                                                        label: `${av.label}${av.priceMultiplier && av.priceMultiplier !== 1 && selectedProduct ? ` (+₹${((selectedProduct.basePrice || 0) * (av.priceMultiplier - 1)).toFixed(2)}/unit)` : ''}`
-                                                      }))}
-                                                    value={selectedDynamicAttributes[attrType._id] as string || ""}
-                                                    onValueChange={(value) => {
-                                                      setSelectedDynamicAttributes({
-                                                        ...selectedDynamicAttributes,
-                                                        [attrType._id]: value
-                                                      });
-                                                      // Mark this attribute as user-selected for image updates
-                                                      setUserSelectedAttributes(prev => new Set(prev).add(attrType._id));
-                                                    }}
-                                                    placeholder={`Select ${attrType.attributeName}`}
-                                                    className="w-full"
-                                                  />
-                                                )}
-                                              </div>
-                                            )}
-
-                                            {attrType.inputStyle === 'RADIO' && (
-                                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3" data-attribute={attrType._id}>
-                                                {attributeValues.length === 0 ? (
-                                                  <div className="col-span-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                                    <p className="text-sm text-yellow-800">
-                                                      No options available for this attribute. Please contact support.
-                                                    </p>
-                                                  </div>
-                                                ) : (
-                                                  attributeValues
-                                                    .filter((av: any) => av && av.value && av.label) // Filter out invalid options
-                                                    .map((av: any) => {
-                                                      // Format price display as per unit price
-                                                      const getPriceDisplay = () => {
-                                                        if (!av.priceMultiplier || av.priceMultiplier === 1 || !selectedProduct) return null;
-                                                        const basePrice = selectedProduct.basePrice || 0;
-                                                        const pricePerUnit = basePrice * (av.priceMultiplier - 1);
-                                                        if (Math.abs(pricePerUnit) < 0.01) return null;
-                                                        return `+₹${pricePerUnit.toFixed(2)}/unit`;
-                                                      };
-
-                                                      const isSelected = selectedDynamicAttributes[attrType._id] === av.value;
-
-                                                      return (
-                                                        <button
-                                                          key={av.value}
-                                                          onClick={() => {
-                                                            setSelectedDynamicAttributes({
-                                                              ...selectedDynamicAttributes,
-                                                              [attrType._id]: av.value
-                                                            });
-                                                            // Mark this attribute as user-selected for image updates
-                                                            setUserSelectedAttributes(prev => new Set(prev).add(attrType._id));
-                                                          }}
-                                                          className={`p-4 rounded-xl border text-left transition-all duration-200 relative ${isSelected
-                                                              ? "border-cream-900 bg-cream-50 text-cream-900 ring-1 ring-cream-900"
-                                                              : "border-cream-200 text-cream-600 hover:border-cream-400 hover:bg-cream-50"
-                                                            }`}
-                                                        >
-                                                          {isSelected && (
-                                                            <div className="absolute top-2 right-2">
-                                                              <Check size={18} className="text-cream-900" />
-                                                            </div>
-                                                          )}
-                                                          {av.image && (
-                                                            <div className="mb-2">
-                                                              <img
-                                                                src={av.image}
-                                                                alt={av.label}
-                                                                className="w-full h-32 object-cover rounded-lg border border-cream-200"
-                                                              />
-                                                            </div>
-                                                          )}
-                                                          <div className="font-bold text-sm">{av.label}</div>
-                                                          {getPriceDisplay() && (
-                                                            <div className="text-xs text-cream-600 mt-1">
-                                                              {getPriceDisplay()}
-                                                            </div>
-                                                          )}
-                                                        </button>
-                                                      );
-                                                    })
-                                                )}
-                                              </div>
-                                            )}
-
-                                            {attrType.inputStyle === 'CHECKBOX' && (
-                                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3" data-attribute={attrType._id}>
-                                                {attributeValues.length === 0 ? (
-                                                  <div className="col-span-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                                    <p className="text-sm text-yellow-800">
-                                                      No options available for this attribute. Please contact support.
-                                                    </p>
-                                                  </div>
-                                                ) : (
-                                                  attributeValues
-                                                    .filter((av: any) => av && av.value && av.label) // Filter out invalid options
-                                                    .map((av: any) => {
-                                                      // Format price display as per unit price
-                                                      const getPriceDisplay = () => {
-                                                        if (!av.priceMultiplier || av.priceMultiplier === 1 || !selectedProduct) return null;
-                                                        const basePrice = selectedProduct.basePrice || 0;
-                                                        const pricePerUnit = basePrice * (av.priceMultiplier - 1);
-                                                        if (Math.abs(pricePerUnit) < 0.01) return null;
-                                                        return `+₹${pricePerUnit.toFixed(2)}/unit`;
-                                                      };
-
-                                                      const isSelected = Array.isArray(selectedDynamicAttributes[attrType._id]) && (selectedDynamicAttributes[attrType._id] as any).includes(av.value);
-
-                                                      return (
-                                                        <button
-                                                          key={av.value}
-                                                          type="button"
-                                                          onClick={() => {
-                                                            const current = Array.isArray(selectedDynamicAttributes[attrType._id]) ? (selectedDynamicAttributes[attrType._id] as any) : [];
-                                                            const newValue = isSelected
-                                                              ? current.filter((v: any) => v !== av.value)
-                                                              : [...current, av.value];
-                                                            setSelectedDynamicAttributes({
-                                                              ...selectedDynamicAttributes,
-                                                              [attrType._id]: newValue
-                                                            });
-                                                            // Mark this attribute as user-selected for image updates
-                                                            setUserSelectedAttributes(prev => new Set(prev).add(attrType._id));
-                                                          }}
-                                                          className={`p-4 rounded-xl border text-left transition-all duration-200 relative ${isSelected
-                                                              ? "border-cream-900 bg-cream-50 text-cream-900 ring-1 ring-cream-900"
-                                                              : "border-cream-200 text-cream-600 hover:border-cream-400 hover:bg-cream-50"
-                                                            }`}
-                                                        >
-                                                          {isSelected && (
-                                                            <div className="absolute top-2 right-2">
-                                                              <Check size={18} className="text-cream-900" />
-                                                            </div>
-                                                          )}
-                                                          {av.image && (
-                                                            <div className="mb-2">
-                                                              <img
-                                                                src={av.image}
-                                                                alt={av.label}
-                                                                className="w-full h-32 object-cover rounded-lg border border-cream-200"
-                                                              />
-                                                            </div>
-                                                          )}
-                                                          <div className="font-bold text-sm">{av.label}</div>
-                                                          {getPriceDisplay() && (
-                                                            <div className="text-xs text-cream-600 mt-1">
-                                                              {getPriceDisplay()}
-                                                            </div>
-                                                          )}
-                                                        </button>
-                                                      );
-                                                    })
-                                                )}
-                                              </div>
-                                            )}
-
-                                            {attrType.inputStyle === 'TEXT_FIELD' && (
-                                              <div data-attribute={attrType._id}>
-                                                <input
-                                                  type="text"
-                                                  value={(selectedDynamicAttributes[attrType._id] as string) || ""}
-                                                  onChange={(e) => {
-                                                    setSelectedDynamicAttributes({
-                                                      ...selectedDynamicAttributes,
-                                                      [attrType._id]: e.target.value
-                                                    });
-                                                    // Mark this attribute as user-selected for image updates
-                                                    setUserSelectedAttributes(prev => new Set(prev).add(attrType._id));
-                                                  }}
-                                                  placeholder={`Enter ${attrType.attributeName}`}
-                                                  className="w-full px-4 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500"
-                                                />
-                                              </div>
-                                            )}
-
-                                            {attrType.inputStyle === 'NUMBER' && (
-                                              <div data-attribute={attrType._id}>
-                                                <input
-                                                  type="number"
-                                                  value={(selectedDynamicAttributes[attrType._id] as number) || ""}
-                                                  onChange={(e) => {
-                                                    setSelectedDynamicAttributes({
-                                                      ...selectedDynamicAttributes,
-                                                      [attrType._id]: parseFloat(e.target.value) || 0
-                                                    });
-                                                    // Mark this attribute as user-selected for image updates
-                                                    setUserSelectedAttributes(prev => new Set(prev).add(attrType._id));
-                                                  }}
-                                                  placeholder={`Enter ${attrType.attributeName}`}
-                                                  className="w-full px-4 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500"
-                                                />
-                                              </div>
-                                            )}
-
-                                            {attrType.inputStyle === 'FILE_UPLOAD' && (
-                                              <div data-attribute={attrType._id}>
-                                                <input
-                                                  type="file"
-                                                  onChange={(e) => {
-                                                    const file = e.target.files?.[0] || null;
-                                                    setSelectedDynamicAttributes({
-                                                      ...selectedDynamicAttributes,
-                                                      [attrType._id]: file
-                                                    });
-                                                    // Mark this attribute as user-selected for image updates
-                                                    if (file) {
-                                                      setUserSelectedAttributes(prev => new Set(prev).add(attrType._id));
-                                                    }
-                                                  }}
-                                                  className="w-full px-4 py-2 border border-cream-300 rounded-lg focus:ring-2 focus:ring-cream-500 focus:border-cream-500"
-                                                  accept="*/*"
-                                                />
-                                                {attrType.fileRequirements && (
-                                                  <p className="text-xs text-cream-600 mt-1">{attrType.fileRequirements}</p>
-                                                )}
-                                              </div>
-                                            )}
-                                          </div>
+                                          <p key={idx} className="text-xs text-blue-800">
+                                            • {range}: <strong>{discountPct}% off</strong>
+                                          </p>
                                         );
                                       })}
-                                  </>
+                                    </div>
+                                  </div>
                                 )}
 
-                              </>
-                            );
-                          })()}
+                                {/* Delivery information removed - will be shown at checkout only */}
 
-                          {/* Delivery information removed - will be shown at checkout only */}
+                                {/* Upload Design Section */}
+                                <div className="mb-6 sm:mb-8 bg-cream-50 p-4 sm:p-6 rounded-xl border border-cream-200" data-upload-section>
+                                  <h3 className="font-bold text-sm sm:text-base text-cream-900 mb-3 sm:mb-4 flex items-center gap-2">
+                                    <UploadIcon size={16} className="sm:w-[18px] sm:h-[18px]" /> Upload Your Design
+                                  </h3>
 
-                          {/* Upload Design Section */}
-                          <div className="mb-6 sm:mb-8 bg-cream-50 p-4 sm:p-6 rounded-xl border border-cream-200" data-upload-section>
-                            <h3 className="font-bold text-sm sm:text-base text-cream-900 mb-3 sm:mb-4 flex items-center gap-2">
-                              <UploadIcon size={16} className="sm:w-[18px] sm:h-[18px]" /> Upload Your Design
-                            </h3>
-
-                            <div className="mb-4">
+                                  <div className="mb-4">
                               <label className="block text-sm text-cream-700 mb-2">Upload Reference Image *</label>
                               <label className="cursor-pointer">
                                 <input
@@ -3942,25 +3712,23 @@ const GlossProductSelection: React.FC = () => {
                                     <div className="flex flex-col items-center gap-2">
                                       <FileImage size={24} className="text-cream-600" />
                                       <span className="text-sm text-cream-600">Click to upload back design</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </label>
-                            </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </label>
+                              </div>
 
-                            <div className="mb-4">
-                              <label className="block text-sm text-cream-700 mb-2">Additional Notes (Optional)</label>
-                              <textarea
-                                value={orderNotes}
-                                onChange={(e) => setOrderNotes(e.target.value)}
-                                placeholder="Any special instructions or notes..."
-                                className="w-full p-3 rounded-lg border border-cream-300 focus:ring-2 focus:ring-cream-900 focus:border-transparent outline-none text-sm resize-none"
-                                rows={3}
-                              />
+                              <div className="mb-4">
+                                <label className="block text-sm text-cream-700 mb-2">Additional Notes (Optional)</label>
+                                <textarea
+                                  value={orderNotes}
+                                  onChange={(e) => setOrderNotes(e.target.value)}
+                                  placeholder="Any special instructions or notes..."
+                                  className="w-full p-3 rounded-lg border border-cream-300 focus:ring-2 focus:ring-cream-900 focus:border-transparent outline-none text-sm resize-none"
+                                  rows={3}
+                                />
+                              </div>
                             </div>
-                          </div>
-
-                        </div>
 
                         {/* Detailed Price Breakdown - Before Place Order */}
                         <div className="mt-6 p-4 sm:p-6 bg-cream-50 rounded-xl border border-cream-200">
@@ -4105,6 +3873,7 @@ const GlossProductSelection: React.FC = () => {
                             <CreditCard size={14} /> Secure Payment & Data Protection
                           </div>
                         </div>
+                      </div>
                       </motion.div>
                     </AnimatePresence>
                   )}
