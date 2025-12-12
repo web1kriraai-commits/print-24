@@ -163,20 +163,18 @@ const TimelineStep: React.FC<{
     <div className={`flex-1 relative ${isLast ? '' : 'mb-8 md:mb-0'}`}>
       {!isLast && (
         <div
-          className={`absolute left-3.5 top-8 w-0.5 h-[calc(100%-2rem)] md:w-[calc(100%-2rem)] md:h-0.5 md:left-8 md:top-3.5 ${
-            isCompleted ? 'bg-green-500' : 'bg-slate-200'
-          }`}
+          className={`absolute left-3.5 top-8 w-0.5 h-[calc(100%-2rem)] md:w-[calc(100%-2rem)] md:h-0.5 md:left-8 md:top-3.5 ${isCompleted ? 'bg-green-500' : 'bg-slate-200'
+            }`}
         />
       )}
       <div className="flex md:flex-col items-center gap-4 md:gap-2">
         <div
-          className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all duration-300 cursor-pointer ${
-            isCompleted
+          className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all duration-300 cursor-pointer ${isCompleted
               ? 'bg-green-500 border-green-500 text-white'
               : isActive
-              ? 'bg-white border-orange-500 text-orange-500 shadow-[0_0_0_4px_rgba(249,115,22,0.2)]'
-              : 'bg-white border-slate-300 text-slate-300'
-          }`}
+                ? 'bg-white border-orange-500 text-orange-500 shadow-[0_0_0_4px_rgba(249,115,22,0.2)]'
+                : 'bg-white border-slate-300 text-slate-300'
+            }`}
           onMouseEnter={() => hasTimestamps && setShowTooltip(true)}
           onMouseLeave={() => setShowTooltip(false)}
         >
@@ -187,7 +185,7 @@ const TimelineStep: React.FC<{
           ) : (
             <Circle className="w-4 h-4" />
           )}
-          
+
           {/* Hover Tooltip */}
           {showTooltip && hasTimestamps && (
             <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-xs rounded-lg shadow-lg z-50 whitespace-nowrap">
@@ -223,9 +221,8 @@ const TimelineStep: React.FC<{
         </div>
         <div className="md:text-center">
           <p
-            className={`text-sm font-semibold ${
-              isActive ? 'text-orange-600' : isCompleted ? 'text-slate-900' : 'text-slate-400'
-            }`}
+            className={`text-sm font-semibold ${isActive ? 'text-orange-600' : isCompleted ? 'text-slate-900' : 'text-slate-400'
+              }`}
           >
             {event.stage}
           </p>
@@ -259,31 +256,28 @@ const DepartmentChip: React.FC<{ status: DepartmentStatus }> = ({ status }) => {
 
   return (
     <div
-      className={`shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg border transition-all duration-300 ${
-        isCompleted
+      className={`shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg border transition-all duration-300 ${isCompleted
           ? 'bg-green-50 border-green-200'
           : isInProgress
-          ? 'bg-white border-orange-400 shadow-sm ring-1 ring-orange-100'
-          : 'bg-slate-50 border-slate-200 opacity-60'
-      }`}
+            ? 'bg-white border-orange-400 shadow-sm ring-1 ring-orange-100'
+            : 'bg-slate-50 border-slate-200 opacity-60'
+        }`}
     >
       <div
-        className={`p-1.5 rounded-full ${
-          isCompleted
+        className={`p-1.5 rounded-full ${isCompleted
             ? 'bg-green-100 text-green-700'
             : isInProgress
-            ? 'bg-orange-100 text-orange-700'
-            : 'bg-slate-200 text-slate-500'
-        }`}
+              ? 'bg-orange-100 text-orange-700'
+              : 'bg-slate-200 text-slate-500'
+          }`}
       >
         {getIcon(status.departmentName)}
       </div>
       <div>
         <div className="flex items-center gap-2">
           <p
-            className={`text-xs font-semibold ${
-              isCompleted ? 'text-green-900' : isInProgress ? 'text-orange-900' : 'text-slate-500'
-            }`}
+            className={`text-xs font-semibold ${isCompleted ? 'text-green-900' : isInProgress ? 'text-orange-900' : 'text-slate-500'
+              }`}
           >
             {status.departmentName}
           </p>
@@ -292,16 +286,16 @@ const DepartmentChip: React.FC<{ status: DepartmentStatus }> = ({ status }) => {
         <p className="text-[10px] text-slate-500">
           {status.completedAt
             ? new Date(status.completedAt).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-              })
+              hour: '2-digit',
+              minute: '2-digit',
+            })
             : status.startedAt
-            ? 'Started ' +
+              ? 'Started ' +
               new Date(status.startedAt).toLocaleTimeString([], {
                 hour: '2-digit',
                 minute: '2-digit',
               })
-            : 'Pending'}
+              : 'Pending'}
         </p>
       </div>
     </div>
@@ -348,7 +342,7 @@ const ProductSpecsPanel: React.FC<{ order: Order }> = ({ order }) => {
               // Handle both stored format (optionName) and display format (name)
               const name = opt.optionName || opt.name || 'Option';
               const priceAdd = opt.priceAdd || 0;
-              
+
               // Use stored description or try to get from product options
               let description = opt.description;
               if (!description && order.product?.options && opt.optionId) {
@@ -357,7 +351,7 @@ const ProductSpecsPanel: React.FC<{ order: Order }> = ({ order }) => {
                 );
                 description = productOption?.description;
               }
-              
+
               return (
                 <div
                   key={idx}
@@ -479,10 +473,10 @@ const PriceBreakdownPanel: React.FC<{ order: Order }> = ({ order }) => {
   };
 
   const calculations = calculateOrderBreakdown(orderForCalc) as any;
-  
+
   // Get additional design charge from product
   const additionalDesignCharge = (order.product as any)?.additionalDesignCharge || 0;
-  
+
   // New calculation order:
   // 1. Base Price = quantity * price
   // 2. Add options/attributes/charges
@@ -492,7 +486,7 @@ const PriceBreakdownPanel: React.FC<{ order: Order }> = ({ order }) => {
   // 6. Subtotal including design charge (after discount)
   // 7. Add GST (on discounted subtotal + design charge)
   // 8. Final total
-  
+
   const subtotalBeforeDiscount = calculations.subtotalBeforeGst || calculations.rawBaseTotal + calculations.optionBreakdowns.reduce((sum: number, opt: any) => sum + opt.cost, 0);
   const subtotalAfterDiscount = calculations.subtotalAfterDiscount || calculations.subtotal || subtotalBeforeDiscount;
   const discountAmount = calculations.discountAmount || (subtotalBeforeDiscount - subtotalAfterDiscount);
@@ -500,7 +494,7 @@ const PriceBreakdownPanel: React.FC<{ order: Order }> = ({ order }) => {
   // GST is calculated on discounted subtotal + design charge
   const gstAmount = (subtotalWithDesignCharge * (order.product?.gstPercentage || 18)) / 100;
   const finalTotal = subtotalWithDesignCharge + gstAmount;
-  
+
   // Use stored totalPrice as source of truth
   const storedTotal = order.totalPrice;
   const categoryName =
@@ -592,11 +586,10 @@ const PriceBreakdownPanel: React.FC<{ order: Order }> = ({ order }) => {
             <div className="flex justify-between items-center">
               <span className="text-slate-500">Balance Due</span>
               <span
-                className={`font-bold ${
-                  order.totalPrice - (order.advancePaid || 0) > 0
+                className={`font-bold ${order.totalPrice - (order.advancePaid || 0) > 0
                     ? 'text-red-600'
                     : 'text-slate-400'
-                }`}
+                  }`}
               >
                 {formatCurrency(order.totalPrice - (order.advancePaid || 0))}
               </span>
@@ -771,7 +764,7 @@ const OrderDetails: React.FC = () => {
         return status === 'completed';
       });
       if (!completedDepts || completedDepts.length === 0) return undefined;
-      
+
       const lastCompleted = completedDepts.reduce((latest, ds) => {
         const dsObj = typeof ds === 'object' ? ds : null;
         const latestObj = typeof latest === 'object' ? latest : null;
@@ -779,7 +772,7 @@ const OrderDetails: React.FC = () => {
         if (!latestObj?.completedAt) return ds;
         return new Date(dsObj.completedAt) > new Date(latestObj.completedAt) ? ds : latest;
       });
-      
+
       return typeof lastCompleted === 'object' ? lastCompleted.completedAt : undefined;
     };
 
@@ -794,10 +787,10 @@ const OrderDetails: React.FC = () => {
     ];
 
     // Design & File Prep
-    const fileUploadedAt = order.uploadedDesign?.frontImage || order.uploadedDesign?.backImage 
-      ? order.createdAt 
+    const fileUploadedAt = order.uploadedDesign?.frontImage || order.uploadedDesign?.backImage
+      ? order.createdAt
       : undefined;
-    
+
     if (fileUploadedAt) {
       stages.push({
         stage: 'Design & File Prep',
@@ -1002,13 +995,12 @@ const OrderDetails: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-3 mb-2">
                   <h1 className="text-2xl font-bold text-slate-900">{order.orderNumber}</h1>
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
-                      order.status === 'completed'
+                    className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${order.status === 'completed'
                         ? 'bg-green-100 text-green-700'
                         : order.status === 'processing'
-                        ? 'bg-orange-100 text-orange-700'
-                        : 'bg-slate-100 text-slate-600'
-                    }`}
+                          ? 'bg-orange-100 text-orange-700'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
                   >
                     {order.status.replace('_', ' ')}
                   </span>
@@ -1017,7 +1009,7 @@ const OrderDetails: React.FC = () => {
                 <div className="text-xs font-semibold uppercase tracking-wide text-brand-600 mb-1">
                   {(() => {
                     const subcategory = order.product?.subcategory;
-                    if (subcategory && typeof subcategory === 'object' && subcategory?.category) {
+                    if (subcategory && typeof subcategory === 'object' && subcategory?.category && typeof subcategory.category === 'object') {
                       return `${subcategory.category.name} • ${subcategory.name}`;
                     } else if (subcategory && typeof subcategory === 'object') {
                       return subcategory.name;
