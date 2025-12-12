@@ -3404,23 +3404,59 @@ const GlossProductSelection: React.FC = () => {
                                                       <label className="block text-xs sm:text-sm font-semibold text-cream-700 mb-2">
                                                         Select Subattribute for "{selectedOption?.label}"
                                                       </label>
-                                                      <Select
-                                                        options={subattributes
+                                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                                                        {subattributes
                                                           .filter((subav: any) => subav && subav.value && subav.label)
-                                                          .map((subav: any) => ({
-                                                            value: subav.value,
-                                                            label: `${subav.label}${subav.priceMultiplier && subav.priceMultiplier !== 1 && selectedProduct ? ` (+₹${((selectedProduct.basePrice || 0) * (subav.priceMultiplier - 1)).toFixed(2)}/unit)` : ''}`
-                                                          }))}
-                                                        value={selectedDynamicAttributes[`${attrType._id}_sub`] as string || ""}
-                                                        onValueChange={(value) => {
-                                                          setSelectedDynamicAttributes({
-                                                            ...selectedDynamicAttributes,
-                                                            [`${attrType._id}_sub`]: value
-                                                          });
-                                                        }}
-                                                        placeholder={`Select subattribute for ${selectedOption?.label}`}
-                                                        className="w-full"
-                                                      />
+                                                          .map((subav: any) => {
+                                                            const getSubPriceDisplay = () => {
+                                                              if (!subav.priceMultiplier || subav.priceMultiplier === 1 || !selectedProduct) return null;
+                                                              const basePrice = selectedProduct.basePrice || 0;
+                                                              const pricePerUnit = basePrice * (subav.priceMultiplier - 1);
+                                                              if (Math.abs(pricePerUnit) < 0.01) return null;
+                                                              return `+₹${pricePerUnit.toFixed(2)}/unit`;
+                                                            };
+                                                            
+                                                            const isSubSelected = selectedDynamicAttributes[`${attrType._id}_sub`] === subav.value;
+                                                            
+                                                            return (
+                                                              <button
+                                                                key={subav.value}
+                                                                onClick={() => {
+                                                                  setSelectedDynamicAttributes({
+                                                                    ...selectedDynamicAttributes,
+                                                                    [`${attrType._id}_sub`]: subav.value
+                                                                  });
+                                                                }}
+                                                                className={`p-3 rounded-lg border text-left transition-all duration-200 relative ${
+                                                                  isSubSelected
+                                                                    ? "border-cream-700 bg-cream-100 text-cream-900 ring-1 ring-cream-700"
+                                                                    : "border-cream-200 text-cream-600 hover:border-cream-400 hover:bg-cream-50"
+                                                                }`}
+                                                              >
+                                                                {isSubSelected && (
+                                                                  <div className="absolute top-2 right-2">
+                                                                    <Check size={16} className="text-cream-900" />
+                                                                  </div>
+                                                                )}
+                                                                {subav.image && (
+                                                                  <div className="mb-2">
+                                                                    <img 
+                                                                      src={subav.image} 
+                                                                      alt={subav.label} 
+                                                                      className="w-full h-24 object-cover rounded-lg border border-cream-200"
+                                                                    />
+                                                                  </div>
+                                                                )}
+                                                                <div className="font-semibold text-xs">{subav.label}</div>
+                                                                {getSubPriceDisplay() && (
+                                                                  <div className="text-xs text-cream-600 mt-1">
+                                                                    {getSubPriceDisplay()}
+                                                                  </div>
+                                                                )}
+                                                              </button>
+                                                            );
+                                                          })}
+                                                      </div>
                                                     </div>
                                                   );
                                                 }
@@ -3710,7 +3746,6 @@ const GlossProductSelection: React.FC = () => {
                                 })}
                             </>
                           )}
-
                         </>
                       );
                     })()}

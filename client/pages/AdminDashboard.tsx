@@ -7697,135 +7697,417 @@ const AdminDashboard: React.FC = () => {
                                       <th className="border border-cream-300 px-3 py-2 text-left text-sm font-medium text-cream-900">
                                         Image (Optional)
                                       </th>
+                                      <th className="border border-cream-300 px-3 py-2 text-center text-sm font-medium text-cream-900">
+                                        Subattributes
+                                      </th>
                                       <th className="border border-cream-300 px-3 py-2 text-center text-sm font-medium text-cream-900 w-20">
                                         Action
                                       </th>
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {(attributeTypeForm.attributeOptionsTable || []).map((option, index) => (
-                                      <tr key={index}>
-                                        <td className="border border-cream-300 px-3 py-2">
-                                          <input
-                                            type="text"
-                                            value={option.name}
-                                            onChange={(e) => {
-                                              const updated = [...attributeTypeForm.attributeOptionsTable];
-                                              updated[index].name = e.target.value;
-                                              setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
-                                            }}
-                                            className="w-full px-2 py-2.5 border border-cream-200 rounded text-sm"
-                                            placeholder="e.g., Both Sides, Express Delivery"
-                                            required
-                                          />
-                                        </td>
-                                        <td className="border border-cream-300 px-3 py-2">
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-sm text-cream-700">₹</span>
-                                            <input
-                                              type="number"
-                                              value={option.priceImpactPer1000}
-                                              onChange={(e) => {
-                                                const updated = [...attributeTypeForm.attributeOptionsTable];
-                                                updated[index].priceImpactPer1000 = e.target.value;
-                                                setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
-                                              }}
-                                              className="w-full px-2 py-2.5 border border-cream-200 rounded text-sm"
-                                              placeholder="0.00000"
-                                              step="0.00001"
-                                              min="0"
-                                            />
-                                            <span className="text-xs text-cream-600 whitespace-nowrap">per 1000</span>
-                                          </div>
-                                        </td>
-                                        <td className="border border-cream-300 px-3 py-2">
-                                          <input
-                                            type="file"
-                                            accept="image/jpeg,image/jpg,image/png,image/webp"
-                                            onChange={async (e) => {
-                                              const file = e.target.files?.[0];
-                                              if (file) {
-                                                // Validate file type
-                                                const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-                                                if (!validTypes.includes(file.type)) {
-                                                  setError("Invalid image format. Please upload JPG, PNG, or WebP image.");
-                                                  return;
-                                                }
-                                                // Validate file size (5MB)
-                                                if (file.size > 5 * 1024 * 1024) {
-                                                  setError("Image size must be less than 5MB.");
-                                                  return;
-                                                }
-                                                
-                                                // Upload to backend API (which uploads to Cloudinary)
-                                                try {
-                                                  setLoading(true);
-                                                  const formData = new FormData();
-                                                  formData.append('image', file);
-                                                  
-                                                  const uploadResponse = await fetch(`${API_BASE_URL}/upload-image`, {
-                                                    method: 'POST',
-                                                    headers: getAuthHeaders(),
-                                                    body: formData,
-                                                  });
-                                                  
-                                                  if (!uploadResponse.ok) {
-                                                    const errorData = await uploadResponse.json().catch(() => ({}));
-                                                    throw new Error(errorData.error || 'Failed to upload image');
-                                                  }
-                                                  
-                                                  const uploadData = await uploadResponse.json();
-                                                  const imageUrl = uploadData.url || uploadData.secure_url;
-                                                  
-                                                  if (!imageUrl) {
-                                                    throw new Error('No image URL returned from server');
-                                                  }
-                                                  
+                                    {(attributeTypeForm.attributeOptionsTable || []).map((option, index) => {
+                                      const isExpanded = expandedSubattributes[index] || false;
+                                      
+                                      return (
+                                        <React.Fragment key={index}>
+                                          <tr>
+                                            <td className="border border-cream-300 px-3 py-2">
+                                              <input
+                                                type="text"
+                                                value={option.name}
+                                                onChange={(e) => {
                                                   const updated = [...attributeTypeForm.attributeOptionsTable];
-                                                  updated[index].image = imageUrl;
+                                                  updated[index].name = e.target.value;
                                                   setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
-                                                  setError(null);
-                                                } catch (err) {
-                                                  console.error("Error uploading image:", err);
-                                                  setError(err instanceof Error ? err.message : "Failed to upload image. Please try again.");
-                                                } finally {
-                                                  setLoading(false);
-                                                }
-                                              }
-                                            }}
-                                            className="w-full px-2 py-2.5 border border-cream-200 rounded text-sm text-sm"
-                                          />
-                                          {option.image && (
-                                            <div className="mt-2">
-                                              <img src={option.image} alt={option.name} className="w-16 h-16 object-cover rounded border border-cream-200" />
+                                                }}
+                                                className="w-full px-2 py-2.5 border border-cream-200 rounded text-sm"
+                                                placeholder="e.g., Both Sides, Express Delivery"
+                                                required
+                                              />
+                                            </td>
+                                            <td className="border border-cream-300 px-3 py-2">
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-sm text-cream-700">₹</span>
+                                                <input
+                                                  type="number"
+                                                  value={option.priceImpactPer1000}
+                                                  onChange={(e) => {
+                                                    const updated = [...attributeTypeForm.attributeOptionsTable];
+                                                    updated[index].priceImpactPer1000 = e.target.value;
+                                                    setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
+                                                  }}
+                                                  className="w-full px-2 py-2.5 border border-cream-200 rounded text-sm"
+                                                  placeholder="0.00000"
+                                                  step="0.00001"
+                                                  min="0"
+                                                />
+                                                <span className="text-xs text-cream-600 whitespace-nowrap">per 1000</span>
+                                              </div>
+                                            </td>
+                                            <td className="border border-cream-300 px-3 py-2">
+                                              <input
+                                                type="file"
+                                                accept="image/jpeg,image/jpg,image/png,image/webp"
+                                                onChange={async (e) => {
+                                                  const file = e.target.files?.[0];
+                                                  if (file) {
+                                                    // Validate file type
+                                                    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+                                                    if (!validTypes.includes(file.type)) {
+                                                      setError("Invalid image format. Please upload JPG, PNG, or WebP image.");
+                                                      return;
+                                                    }
+                                                    // Validate file size (5MB)
+                                                    if (file.size > 5 * 1024 * 1024) {
+                                                      setError("Image size must be less than 5MB.");
+                                                      return;
+                                                    }
+                                                    
+                                                    // Upload to backend API (which uploads to Cloudinary)
+                                                    try {
+                                                      setLoading(true);
+                                                      const formData = new FormData();
+                                                      formData.append('image', file);
+                                                      
+                                                      // For FormData uploads, don't set Content-Type - let browser set it with boundary
+                                                      const uploadHeaders = getAuthHeaders();
+                                                      delete uploadHeaders['Content-Type']; // Remove Content-Type for FormData
+                                                      
+                                                      const uploadResponse = await fetch(`${API_BASE_URL}/upload-image`, {
+                                                        method: 'POST',
+                                                        headers: uploadHeaders,
+                                                        body: formData,
+                                                      });
+                                                      
+                                                      if (!uploadResponse.ok) {
+                                                        const errorData = await uploadResponse.json().catch(() => ({}));
+                                                        throw new Error(errorData.error || 'Failed to upload image');
+                                                      }
+                                                      
+                                                      const uploadData = await uploadResponse.json();
+                                                      const imageUrl = uploadData.url || uploadData.secure_url;
+                                                      
+                                                      if (!imageUrl) {
+                                                        throw new Error('No image URL returned from server');
+                                                      }
+                                                      
+                                                      const updated = [...attributeTypeForm.attributeOptionsTable];
+                                                      updated[index].image = imageUrl;
+                                                      setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
+                                                      setError(null);
+                                                    } catch (err) {
+                                                      console.error("Error uploading image:", err);
+                                                      setError(err instanceof Error ? err.message : "Failed to upload image. Please try again.");
+                                                    } finally {
+                                                      setLoading(false);
+                                                    }
+                                                  }
+                                                }}
+                                                className="w-full px-2 py-2.5 border border-cream-200 rounded text-sm text-sm"
+                                              />
+                                              {option.image && (
+                                                <div className="mt-2">
+                                                  <img src={option.image} alt={option.name} className="w-16 h-16 object-cover rounded border border-cream-200" />
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      const updated = [...attributeTypeForm.attributeOptionsTable];
+                                                      updated[index].image = undefined;
+                                                      setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
+                                                    }}
+                                                    className="mt-1 text-xs text-red-600 hover:text-red-800"
+                                                  >
+                                                    Remove
+                                                  </button>
+                                                </div>
+                                              )}
+                                            </td>
+                                            <td className="border border-cream-300 px-3 py-2">
+                                              <div className="flex flex-col gap-2">
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    const updated = [...attributeTypeForm.attributeOptionsTable];
+                                                    if (!updated[index].subattributes) {
+                                                      updated[index].subattributes = [];
+                                                    }
+                                                    updated[index].subattributes!.push({ name: "", priceImpactPer1000: "", image: undefined });
+                                                    setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
+                                                    // Auto-expand when adding subattribute
+                                                    setExpandedSubattributes((prev) => ({ ...prev, [index]: true }));
+                                                  }}
+                                                  className="w-full px-3 py-2 text-xs font-semibold bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg active:scale-95"
+                                                >
+                                                  <Plus size={16} className="font-bold" />
+                                                  Add Subattribute
+                                                </button>
+                                                {option.subattributes && option.subattributes.length > 0 && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.preventDefault();
+                                                      e.stopPropagation();
+                                                      setExpandedSubattributes((prev) => ({ ...prev, [index]: !isExpanded }));
+                                                    }}
+                                                    className="w-full px-2 py-1.5 text-xs font-medium bg-green-50 text-green-700 rounded-md hover:bg-green-100 transition-colors flex items-center justify-center gap-1 border border-green-200"
+                                                  >
+                                                    {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                                    {isExpanded ? 'Hide' : 'View'} ({option.subattributes.length})
+                                                  </button>
+                                                )}
+                                                {(!option.subattributes || option.subattributes.length === 0) && (
+                                                  <p className="text-xs text-center text-cream-500 mt-1">
+                                                    No subattributes
+                                                  </p>
+                                                )}
+                                              </div>
+                                            </td>
+                                            <td className="border border-cream-300 px-3 py-2 text-center">
                                               <button
                                                 type="button"
                                                 onClick={() => {
-                                                  const updated = [...attributeTypeForm.attributeOptionsTable];
-                                                  updated[index].image = undefined;
+                                                  const updated = attributeTypeForm.attributeOptionsTable.filter((_, i) => i !== index);
                                                   setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
+                                                  // Clean up expanded state for deleted option and reindex remaining ones
+                                                  const newExpanded: { [key: number]: boolean } = {};
+                                                  Object.keys(expandedSubattributes).forEach((key) => {
+                                                    const keyNum = parseInt(key);
+                                                    if (keyNum < index) {
+                                                      newExpanded[keyNum] = expandedSubattributes[keyNum];
+                                                    } else if (keyNum > index) {
+                                                      newExpanded[keyNum - 1] = expandedSubattributes[keyNum];
+                                                    }
+                                                  });
+                                                  setExpandedSubattributes(newExpanded);
                                                 }}
-                                                className="mt-1 text-xs text-red-600 hover:text-red-800"
+                                                className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
                                               >
-                                                Remove
+                                                <Trash2 size={16} />
                                               </button>
-                                            </div>
-                                          )}
-                                        </td>
-                                        <td className="border border-cream-300 px-3 py-2 text-center">
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              const updated = attributeTypeForm.attributeOptionsTable.filter((_, i) => i !== index);
-                                              setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
-                                            }}
-                                            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                          >
-                                            <Trash2 size={16} />
-                                          </button>
-                                        </td>
-                                      </tr>
-                                    ))}
+                                            </td>
+                                          </tr>
+                                          {isExpanded && (
+                                            <tr>
+                                              <td colSpan={5} className="border border-cream-300 px-4 py-4 bg-gradient-to-br from-cream-50 to-cream-100">
+                                                <div className="space-y-4">
+                                                  <div className="flex items-center justify-between pb-2 border-b border-cream-300">
+                                                    <div className="flex items-center gap-2">
+                                                      <div className="w-1 h-6 bg-gradient-to-b from-cream-600 to-cream-800 rounded-full"></div>
+                                                      <h4 className="text-sm font-semibold text-cream-900">
+                                                        Subattributes for <span className="text-cream-700 font-bold">"{option.name || 'Option ' + (index + 1)}"</span>
+                                                      </h4>
+                                                      {option.subattributes && option.subattributes.length > 0 && (
+                                                        <span className="px-2 py-0.5 bg-cream-200 text-cream-800 rounded-full text-xs font-medium">
+                                                          {option.subattributes.length} {option.subattributes.length === 1 ? 'subattribute' : 'subattributes'}
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => {
+                                                        const updated = [...attributeTypeForm.attributeOptionsTable];
+                                                        if (!updated[index].subattributes) {
+                                                          updated[index].subattributes = [];
+                                                        }
+                                                        updated[index].subattributes!.push({ name: "", priceImpactPer1000: "", image: undefined });
+                                                        setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
+                                                      }}
+                                                      className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-cream-700 to-cream-800 text-white rounded-lg hover:from-cream-800 hover:to-cream-900 transition-all duration-200 flex items-center gap-1.5 shadow-sm hover:shadow-md"
+                                                    >
+                                                      <Plus size={14} className="font-bold" />
+                                                      Add Another
+                                                    </button>
+                                                  </div>
+                                                  {(!option.subattributes || option.subattributes.length === 0) ? (
+                                                    <div className="text-center py-8 bg-white rounded-lg border-2 border-dashed border-cream-300">
+                                                      <div className="flex flex-col items-center gap-2">
+                                                        <div className="w-12 h-12 rounded-full bg-cream-100 flex items-center justify-center">
+                                                          <Plus size={20} className="text-cream-600" />
+                                                        </div>
+                                                        <p className="text-sm font-medium text-cream-700">
+                                                          No subattributes added yet
+                                                        </p>
+                                                        <p className="text-xs text-cream-500 max-w-xs">
+                                                          Click "Add Subattribute" button above to create subattributes for this option
+                                                        </p>
+                                                      </div>
+                                                    </div>
+                                                  ) : (
+                                                    <div className="border border-cream-300 rounded-lg overflow-hidden bg-white shadow-sm">
+                                                      <div className="overflow-x-auto">
+                                                        <table className="w-full border-collapse">
+                                                          <thead>
+                                                            <tr className="bg-gradient-to-r from-cream-100 to-cream-200">
+                                                              <th className="border border-cream-300 px-4 py-2.5 text-left text-xs font-semibold text-cream-900 uppercase tracking-wide">
+                                                                Subattribute Name *
+                                                              </th>
+                                                              <th className="border border-cream-300 px-4 py-2.5 text-left text-xs font-semibold text-cream-900 uppercase tracking-wide">
+                                                                Price Impact (₹ per 1000)
+                                                              </th>
+                                                              <th className="border border-cream-300 px-4 py-2.5 text-left text-xs font-semibold text-cream-900 uppercase tracking-wide">
+                                                                Image (Optional)
+                                                              </th>
+                                                              <th className="border border-cream-300 px-4 py-2.5 text-center text-xs font-semibold text-cream-900 uppercase tracking-wide w-20">
+                                                                Action
+                                                              </th>
+                                                            </tr>
+                                                          </thead>
+                                                          <tbody>
+                                                            {option.subattributes.map((subattr, subIndex) => (
+                                                            <tr key={subIndex} className="hover:bg-cream-50 transition-colors">
+                                                              <td className="border border-cream-300 px-4 py-3">
+                                                                <input
+                                                                  type="text"
+                                                                  value={subattr.name}
+                                                                  onChange={(e) => {
+                                                                    const updated = [...attributeTypeForm.attributeOptionsTable];
+                                                                    if (!updated[index].subattributes) {
+                                                                      updated[index].subattributes = [];
+                                                                    }
+                                                                    updated[index].subattributes![subIndex].name = e.target.value;
+                                                                    setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
+                                                                  }}
+                                                                  className="w-full px-3 py-2 border border-cream-200 rounded-md text-sm focus:ring-2 focus:ring-cream-500 focus:border-cream-500 transition-all"
+                                                                  placeholder="e.g., A1, A2, A3"
+                                                                  required
+                                                                />
+                                                              </td>
+                                                              <td className="border border-cream-300 px-4 py-3">
+                                                                <div className="flex items-center gap-2">
+                                                                  <span className="text-sm font-medium text-cream-700">₹</span>
+                                                                  <input
+                                                                    type="number"
+                                                                    value={subattr.priceImpactPer1000}
+                                                                    onChange={(e) => {
+                                                                      const updated = [...attributeTypeForm.attributeOptionsTable];
+                                                                      if (!updated[index].subattributes) {
+                                                                        updated[index].subattributes = [];
+                                                                      }
+                                                                      updated[index].subattributes![subIndex].priceImpactPer1000 = e.target.value;
+                                                                      setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
+                                                                    }}
+                                                                    className="w-full px-3 py-2 border border-cream-200 rounded-md text-sm focus:ring-2 focus:ring-cream-500 focus:border-cream-500 transition-all"
+                                                                    placeholder="0.00000"
+                                                                    step="0.00001"
+                                                                    min="0"
+                                                                  />
+                                                                </div>
+                                                              </td>
+                                                              <td className="border border-cream-300 px-4 py-3">
+                                                                <div className="space-y-2">
+                                                                  <input
+                                                                    type="file"
+                                                                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                                                                    onChange={async (e) => {
+                                                                    const file = e.target.files?.[0];
+                                                                    if (file) {
+                                                                      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+                                                                      if (!validTypes.includes(file.type)) {
+                                                                        setError("Invalid image format. Please upload JPG, PNG, or WebP image.");
+                                                                        return;
+                                                                      }
+                                                                      if (file.size > 5 * 1024 * 1024) {
+                                                                        setError("Image size must be less than 5MB.");
+                                                                        return;
+                                                                      }
+                                                                      
+                                                                      try {
+                                                                        setLoading(true);
+                                                                        const formData = new FormData();
+                                                                        formData.append('image', file);
+                                                                        
+                                                                        const uploadHeaders = getAuthHeaders();
+                                                                        delete uploadHeaders['Content-Type']; // Remove Content-Type for FormData
+                                                                        const uploadResponse = await fetch(`${API_BASE_URL}/upload-image`, {
+                                                                          method: 'POST',
+                                                                          headers: uploadHeaders,
+                                                                          body: formData,
+                                                                        });
+                                                                        
+                                                                        if (!uploadResponse.ok) {
+                                                                          const errorData = await uploadResponse.json().catch(() => ({}));
+                                                                          throw new Error(errorData.error || 'Failed to upload image');
+                                                                        }
+                                                                        
+                                                                        const uploadData = await uploadResponse.json();
+                                                                        const imageUrl = uploadData.url || uploadData.secure_url;
+                                                                        
+                                                                        if (!imageUrl) {
+                                                                          throw new Error('No image URL returned from server');
+                                                                        }
+                                                                        
+                                                                        const updated = [...attributeTypeForm.attributeOptionsTable];
+                                                                        if (!updated[index].subattributes) {
+                                                                          updated[index].subattributes = [];
+                                                                        }
+                                                                        updated[index].subattributes![subIndex].image = imageUrl;
+                                                                        setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
+                                                                        setError(null);
+                                                                      } catch (err) {
+                                                                        console.error("Error uploading image:", err);
+                                                                        setError(err instanceof Error ? err.message : "Failed to upload image. Please try again.");
+                                                                      } finally {
+                                                                        setLoading(false);
+                                                                      }
+                                                                    }
+                                                                  }}
+                                                                  className="w-full px-3 py-2 border border-cream-200 rounded-md text-xs focus:ring-2 focus:ring-cream-500 focus:border-cream-500 transition-all file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-cream-100 file:text-cream-700 hover:file:bg-cream-200 cursor-pointer"
+                                                                />
+                                                                {subattr.image && (
+                                                                  <div className="flex items-start gap-2 p-2 bg-cream-50 rounded-md border border-cream-200">
+                                                                    <img src={subattr.image} alt={subattr.name} className="w-16 h-16 object-cover rounded-md border-2 border-cream-300 shadow-sm" />
+                                                                    <button
+                                                                      type="button"
+                                                                      onClick={() => {
+                                                                        const updated = [...attributeTypeForm.attributeOptionsTable];
+                                                                        if (!updated[index].subattributes) {
+                                                                          updated[index].subattributes = [];
+                                                                        }
+                                                                        updated[index].subattributes![subIndex].image = undefined;
+                                                                        setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
+                                                                      }}
+                                                                      className="px-2 py-1 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors border border-red-200"
+                                                                    >
+                                                                      Remove
+                                                                    </button>
+                                                                  </div>
+                                                                )}
+                                                                </div>
+                                                              </td>
+                                                              <td className="border border-cream-300 px-4 py-3 text-center">
+                                                                <button
+                                                                  type="button"
+                                                                  onClick={() => {
+                                                                    const updated = [...attributeTypeForm.attributeOptionsTable];
+                                                                    if (!updated[index].subattributes) {
+                                                                      updated[index].subattributes = [];
+                                                                    }
+                                                                    updated[index].subattributes = updated[index].subattributes!.filter((_, i) => i !== subIndex);
+                                                                    setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
+                                                                  }}
+                                                                  className="p-2 text-red-600 hover:bg-red-50 hover:text-red-700 rounded-md transition-all border border-red-200 hover:border-red-300"
+                                                                  title="Delete subattribute"
+                                                                >
+                                                                  <Trash2 size={16} />
+                                                                </button>
+                                                              </td>
+                                                            </tr>
+                                                          ))}
+                                                        </tbody>
+                                                      </table>
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        )}
+                                      </React.Fragment>
+                                    );
+                                  })}
                                   </tbody>
                                 </table>
                               </div>
@@ -8504,9 +8786,13 @@ const AdminDashboard: React.FC = () => {
                                                   const formData = new FormData();
                                                   formData.append('image', file);
                                                   
+                                                  // For FormData uploads, don't set Content-Type - let browser set it with boundary
+                                                  const uploadHeaders = getAuthHeaders();
+                                                  delete uploadHeaders['Content-Type']; // Remove Content-Type for FormData
+                                                  
                                                   const uploadResponse = await fetch(`${API_BASE_URL}/upload-image`, {
                                                     method: 'POST',
-                                                    headers: getAuthHeaders(),
+                                                    headers: uploadHeaders,
                                                     body: formData,
                                                   });
                                                   
@@ -8553,22 +8839,47 @@ const AdminDashboard: React.FC = () => {
                                             </div>
                                           )}
                                         </td>
-                                        <td className="border border-cream-300 px-3 py-2 text-center">
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setExpandedSubattributes((prev) => ({ ...prev, [index]: !isExpanded }));
-                                            }}
-                                            className="px-3 py-1 text-xs bg-cream-700 text-white rounded-lg hover:bg-cream-800 transition-colors flex items-center gap-1 mx-auto"
-                                          >
-                                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                            {isExpanded ? 'Hide' : 'Manage'} Subattributes
+                                        <td className="border border-cream-300 px-3 py-2">
+                                          <div className="flex flex-col gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                const updated = [...attributeTypeForm.attributeOptionsTable];
+                                                if (!updated[index].subattributes) {
+                                                  updated[index].subattributes = [];
+                                                }
+                                                updated[index].subattributes!.push({ name: "", priceImpactPer1000: "", image: undefined });
+                                                setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
+                                                // Auto-expand when adding subattribute
+                                                setExpandedSubattributes((prev) => ({ ...prev, [index]: true }));
+                                              }}
+                                              className="w-full px-3 py-2 text-xs font-semibold bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg active:scale-95"
+                                            >
+                                              <Plus size={16} className="font-bold" />
+                                              Add Subattribute
+                                            </button>
                                             {option.subattributes && option.subattributes.length > 0 && (
-                                              <span className="ml-1 bg-cream-900 text-white rounded-full px-1.5 py-0.5 text-xs">
-                                                {option.subattributes.length}
-                                              </span>
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.preventDefault();
+                                                  e.stopPropagation();
+                                                  setExpandedSubattributes((prev) => ({ ...prev, [index]: !isExpanded }));
+                                                }}
+                                                className="w-full px-2 py-1.5 text-xs font-medium bg-green-50 text-green-700 rounded-md hover:bg-green-100 transition-colors flex items-center justify-center gap-1 border border-green-200"
+                                              >
+                                                {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                                {isExpanded ? 'Hide' : 'View'} ({option.subattributes.length})
+                                              </button>
                                             )}
-                                          </button>
+                                            {(!option.subattributes || option.subattributes.length === 0) && (
+                                              <p className="text-xs text-center text-cream-500 mt-1">
+                                                No subattributes
+                                              </p>
+                                            )}
+                                          </div>
                                         </td>
                                         <td className="border border-cream-300 px-3 py-2 text-center">
                                           <button
@@ -8596,12 +8907,20 @@ const AdminDashboard: React.FC = () => {
                                       </tr>
                                       {isExpanded && (
                                         <tr>
-                                          <td colSpan={5} className="border border-cream-300 px-3 py-4 bg-cream-50">
-                                            <div className="space-y-3">
-                                              <div className="flex items-center justify-between">
-                                                <h4 className="text-sm font-semibold text-cream-900">
-                                                  Subattributes for "{option.name || 'Option ' + (index + 1)}"
-                                                </h4>
+                                          <td colSpan={5} className="border border-cream-300 px-4 py-4 bg-gradient-to-br from-cream-50 to-cream-100">
+                                            <div className="space-y-4">
+                                              <div className="flex items-center justify-between pb-2 border-b border-cream-300">
+                                                <div className="flex items-center gap-2">
+                                                  <div className="w-1 h-6 bg-gradient-to-b from-cream-600 to-cream-800 rounded-full"></div>
+                                                  <h4 className="text-sm font-semibold text-cream-900">
+                                                    Subattributes for <span className="text-cream-700 font-bold">"{option.name || 'Option ' + (index + 1)}"</span>
+                                                  </h4>
+                                                  {option.subattributes && option.subattributes.length > 0 && (
+                                                    <span className="px-2 py-0.5 bg-cream-200 text-cream-800 rounded-full text-xs font-medium">
+                                                      {option.subattributes.length} {option.subattributes.length === 1 ? 'subattribute' : 'subattributes'}
+                                                    </span>
+                                                  )}
+                                                </div>
                                                 <button
                                                   type="button"
                                                   onClick={() => {
@@ -8612,39 +8931,50 @@ const AdminDashboard: React.FC = () => {
                                                     updated[index].subattributes!.push({ name: "", priceImpactPer1000: "", image: undefined });
                                                     setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
                                                   }}
-                                                  className="px-3 py-1 text-xs bg-cream-900 text-white rounded-lg hover:bg-cream-800 transition-colors flex items-center gap-1"
+                                                  className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-cream-700 to-cream-800 text-white rounded-lg hover:from-cream-800 hover:to-cream-900 transition-all duration-200 flex items-center gap-1.5 shadow-sm hover:shadow-md"
                                                 >
-                                                  <Plus size={14} />
-                                                  Add Subattribute
+                                                  <Plus size={14} className="font-bold" />
+                                                  Add Another
                                                 </button>
                                               </div>
                                               {(!option.subattributes || option.subattributes.length === 0) ? (
-                                                <p className="text-xs text-cream-600 text-center py-2">
-                                                  No subattributes added. Click "Add Subattribute" to start.
-                                                </p>
+                                                <div className="text-center py-8 bg-white rounded-lg border-2 border-dashed border-cream-300">
+                                                  <div className="flex flex-col items-center gap-2">
+                                                    <div className="w-12 h-12 rounded-full bg-cream-100 flex items-center justify-center">
+                                                      <Plus size={20} className="text-cream-600" />
+                                                    </div>
+                                                    <p className="text-sm font-medium text-cream-700">
+                                                      No subattributes added yet
+                                                    </p>
+                                                    <p className="text-xs text-cream-500 max-w-xs">
+                                                      Click "Add Subattribute" button above to create subattributes for this option
+                                                    </p>
+                                                  </div>
+                                                </div>
                                               ) : (
-                                                <div className="border border-cream-300 rounded-lg overflow-hidden bg-white">
-                                                  <table className="w-full border-collapse">
-                                                    <thead>
-                                                      <tr className="bg-cream-200">
-                                                        <th className="border border-cream-300 px-3 py-2 text-left text-xs font-medium text-cream-900">
-                                                          Subattribute Name *
-                                                        </th>
-                                                        <th className="border border-cream-300 px-3 py-2 text-left text-xs font-medium text-cream-900">
-                                                          Price Impact (₹ per 1000)
-                                                        </th>
-                                                        <th className="border border-cream-300 px-3 py-2 text-left text-xs font-medium text-cream-900">
-                                                          Image (Optional)
-                                                        </th>
-                                                        <th className="border border-cream-300 px-3 py-2 text-center text-xs font-medium text-cream-900 w-16">
-                                                          Action
-                                                        </th>
-                                                      </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                      {option.subattributes.map((subattr, subIndex) => (
-                                                        <tr key={subIndex}>
-                                                          <td className="border border-cream-300 px-3 py-2">
+                                                <div className="border border-cream-300 rounded-lg overflow-hidden bg-white shadow-sm">
+                                                  <div className="overflow-x-auto">
+                                                    <table className="w-full border-collapse">
+                                                      <thead>
+                                                        <tr className="bg-gradient-to-r from-cream-100 to-cream-200">
+                                                          <th className="border border-cream-300 px-4 py-2.5 text-left text-xs font-semibold text-cream-900 uppercase tracking-wide">
+                                                            Subattribute Name *
+                                                          </th>
+                                                          <th className="border border-cream-300 px-4 py-2.5 text-left text-xs font-semibold text-cream-900 uppercase tracking-wide">
+                                                            Price Impact (₹ per 1000)
+                                                          </th>
+                                                          <th className="border border-cream-300 px-4 py-2.5 text-left text-xs font-semibold text-cream-900 uppercase tracking-wide">
+                                                            Image (Optional)
+                                                          </th>
+                                                          <th className="border border-cream-300 px-4 py-2.5 text-center text-xs font-semibold text-cream-900 uppercase tracking-wide w-20">
+                                                            Action
+                                                          </th>
+                                                        </tr>
+                                                      </thead>
+                                                      <tbody>
+                                                        {option.subattributes.map((subattr, subIndex) => (
+                                                        <tr key={subIndex} className="hover:bg-cream-50 transition-colors">
+                                                          <td className="border border-cream-300 px-4 py-3">
                                                             <input
                                                               type="text"
                                                               value={subattr.name}
@@ -8656,14 +8986,14 @@ const AdminDashboard: React.FC = () => {
                                                                 updated[index].subattributes![subIndex].name = e.target.value;
                                                                 setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
                                                               }}
-                                                              className="w-full px-2 py-1.5 border border-cream-200 rounded text-xs"
+                                                              className="w-full px-3 py-2 border border-cream-200 rounded-md text-sm focus:ring-2 focus:ring-cream-500 focus:border-cream-500 transition-all"
                                                               placeholder="e.g., A1, A2, A3"
                                                               required
                                                             />
                                                           </td>
-                                                          <td className="border border-cream-300 px-3 py-2">
-                                                            <div className="flex items-center gap-1">
-                                                              <span className="text-xs text-cream-700">₹</span>
+                                                          <td className="border border-cream-300 px-4 py-3">
+                                                            <div className="flex items-center gap-2">
+                                                              <span className="text-sm font-medium text-cream-700">₹</span>
                                                               <input
                                                                 type="number"
                                                                 value={subattr.priceImpactPer1000}
@@ -8675,18 +9005,19 @@ const AdminDashboard: React.FC = () => {
                                                                   updated[index].subattributes![subIndex].priceImpactPer1000 = e.target.value;
                                                                   setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
                                                                 }}
-                                                                className="w-full px-2 py-1.5 border border-cream-200 rounded text-xs"
+                                                                className="w-full px-3 py-2 border border-cream-200 rounded-md text-sm focus:ring-2 focus:ring-cream-500 focus:border-cream-500 transition-all"
                                                                 placeholder="0.00000"
                                                                 step="0.00001"
                                                                 min="0"
                                                               />
                                                             </div>
                                                           </td>
-                                                          <td className="border border-cream-300 px-3 py-2">
-                                                            <input
-                                                              type="file"
-                                                              accept="image/jpeg,image/jpg,image/png,image/webp"
-                                                              onChange={async (e) => {
+                                                          <td className="border border-cream-300 px-4 py-3">
+                                                            <div className="space-y-2">
+                                                              <input
+                                                                type="file"
+                                                                accept="image/jpeg,image/jpg,image/png,image/webp"
+                                                                onChange={async (e) => {
                                                                 const file = e.target.files?.[0];
                                                                 if (file) {
                                                                   const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -8704,9 +9035,11 @@ const AdminDashboard: React.FC = () => {
                                                                     const formData = new FormData();
                                                                     formData.append('image', file);
                                                                     
+                                                                    const uploadHeaders = getAuthHeaders();
+                                                                    delete uploadHeaders['Content-Type']; // Remove Content-Type for FormData
                                                                     const uploadResponse = await fetch(`${API_BASE_URL}/upload-image`, {
                                                                       method: 'POST',
-                                                                      headers: getAuthHeaders(),
+                                                                      headers: uploadHeaders,
                                                                       body: formData,
                                                                     });
                                                                     
@@ -8737,11 +9070,11 @@ const AdminDashboard: React.FC = () => {
                                                                   }
                                                                 }
                                                               }}
-                                                              className="w-full px-2 py-1.5 border border-cream-200 rounded text-xs"
+                                                              className="w-full px-3 py-2 border border-cream-200 rounded-md text-xs focus:ring-2 focus:ring-cream-500 focus:border-cream-500 transition-all file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-cream-100 file:text-cream-700 hover:file:bg-cream-200 cursor-pointer"
                                                             />
                                                             {subattr.image && (
-                                                              <div className="mt-1">
-                                                                <img src={subattr.image} alt={subattr.name} className="w-12 h-12 object-cover rounded border border-cream-200" />
+                                                              <div className="flex items-start gap-2 p-2 bg-cream-50 rounded-md border border-cream-200">
+                                                                <img src={subattr.image} alt={subattr.name} className="w-16 h-16 object-cover rounded-md border-2 border-cream-300 shadow-sm" />
                                                                 <button
                                                                   type="button"
                                                                   onClick={() => {
@@ -8752,14 +9085,15 @@ const AdminDashboard: React.FC = () => {
                                                                     updated[index].subattributes![subIndex].image = undefined;
                                                                     setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
                                                                   }}
-                                                                  className="mt-0.5 text-xs text-red-600 hover:text-red-800"
+                                                                  className="px-2 py-1 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors border border-red-200"
                                                                 >
                                                                   Remove
                                                                 </button>
                                                               </div>
                                                             )}
+                                                            </div>
                                                           </td>
-                                                          <td className="border border-cream-300 px-3 py-2 text-center">
+                                                          <td className="border border-cream-300 px-4 py-3 text-center">
                                                             <button
                                                               type="button"
                                                               onClick={() => {
@@ -8770,15 +9104,17 @@ const AdminDashboard: React.FC = () => {
                                                                 updated[index].subattributes = updated[index].subattributes!.filter((_, i) => i !== subIndex);
                                                                 setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
                                                               }}
-                                                              className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                              className="p-2 text-red-600 hover:bg-red-50 hover:text-red-700 rounded-md transition-all border border-red-200 hover:border-red-300"
+                                                              title="Delete subattribute"
                                                             >
-                                                              <Trash2 size={14} />
+                                                              <Trash2 size={16} />
                                                             </button>
                                                           </td>
                                                         </tr>
                                                       ))}
                                                     </tbody>
                                                   </table>
+                                                  </div>
                                                 </div>
                                               )}
                                             </div>
@@ -11288,7 +11624,7 @@ const AdminDashboard: React.FC = () => {
                           onClick={() => {
                             setAttributeTypeForm({
                               ...attributeTypeForm,
-                              attributeOptionsTable: [...attributeTypeForm.attributeOptionsTable, { name: "", priceImpactPer1000: "", image: undefined }],
+                              attributeOptionsTable: [...attributeTypeForm.attributeOptionsTable, { name: "", priceImpactPer1000: "", image: undefined, subattributes: [] }],
                             });
                           }}
                           className="px-3 py-1 text-sm bg-cream-900 text-white rounded-lg hover:bg-cream-800 transition-colors flex items-center gap-2"
@@ -11321,14 +11657,21 @@ const AdminDashboard: React.FC = () => {
                                   <th className="border border-cream-300 px-3 py-2 text-left text-sm font-medium text-cream-900">
                                     Image (Optional)
                                   </th>
+                                  <th className="border border-cream-300 px-3 py-2 text-center text-sm font-medium text-cream-900">
+                                    Subattributes
+                                  </th>
                                   <th className="border border-cream-300 px-3 py-2 text-center text-sm font-medium text-cream-900 w-20">
                                     Action
                                   </th>
                                 </tr>
                               </thead>
                               <tbody>
-                                {(attributeTypeForm.attributeOptionsTable || []).map((option, index) => (
-                                  <tr key={index}>
+                                {(attributeTypeForm.attributeOptionsTable || []).map((option, index) => {
+                                  const isExpanded = expandedSubattributes[index] || false;
+                                  
+                                  return (
+                                    <React.Fragment key={index}>
+                                      <tr>
                                     <td className="border border-cream-300 px-3 py-2">
                                       <input
                                         type="text"
@@ -11436,12 +11779,65 @@ const AdminDashboard: React.FC = () => {
                                         </div>
                                       )}
                                     </td>
+                                    <td className="border border-cream-300 px-3 py-2">
+                                      <div className="flex flex-col gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            const updated = [...attributeTypeForm.attributeOptionsTable];
+                                            if (!updated[index].subattributes) {
+                                              updated[index].subattributes = [];
+                                            }
+                                            updated[index].subattributes!.push({ name: "", priceImpactPer1000: "", image: undefined });
+                                            setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
+                                            // Auto-expand when adding subattribute
+                                            setExpandedSubattributes((prev) => ({ ...prev, [index]: true }));
+                                          }}
+                                          className="w-full px-3 py-2 text-xs font-semibold bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg active:scale-95"
+                                        >
+                                          <Plus size={16} className="font-bold" />
+                                          Add Subattribute
+                                        </button>
+                                        {option.subattributes && option.subattributes.length > 0 && (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              setExpandedSubattributes((prev) => ({ ...prev, [index]: !isExpanded }));
+                                            }}
+                                            className="w-full px-2 py-1.5 text-xs font-medium bg-green-50 text-green-700 rounded-md hover:bg-green-100 transition-colors flex items-center justify-center gap-1 border border-green-200"
+                                          >
+                                            {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                            {isExpanded ? 'Hide' : 'View'} ({option.subattributes.length})
+                                          </button>
+                                        )}
+                                        {(!option.subattributes || option.subattributes.length === 0) && (
+                                          <p className="text-xs text-center text-cream-500 mt-1">
+                                            No subattributes
+                                          </p>
+                                        )}
+                                      </div>
+                                    </td>
                                     <td className="border border-cream-300 px-3 py-2 text-center">
                                       <button
                                         type="button"
                                         onClick={() => {
                                           const updated = attributeTypeForm.attributeOptionsTable.filter((_, i) => i !== index);
                                           setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
+                                          // Clean up expanded state for deleted option and reindex remaining ones
+                                          const newExpanded: { [key: number]: boolean } = {};
+                                          Object.keys(expandedSubattributes).forEach((key) => {
+                                            const keyNum = parseInt(key);
+                                            if (keyNum < index) {
+                                              newExpanded[keyNum] = expandedSubattributes[keyNum];
+                                            } else if (keyNum > index) {
+                                              newExpanded[keyNum - 1] = expandedSubattributes[keyNum];
+                                            }
+                                          });
+                                          setExpandedSubattributes(newExpanded);
                                         }}
                                         className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
                                       >
@@ -11449,7 +11845,225 @@ const AdminDashboard: React.FC = () => {
                                       </button>
                                     </td>
                                   </tr>
-                                ))}
+                                  {isExpanded && (
+                                    <tr>
+                                      <td colSpan={5} className="border border-cream-300 px-4 py-4 bg-gradient-to-br from-cream-50 to-cream-100">
+                                        <div className="space-y-4">
+                                          <div className="flex items-center justify-between pb-2 border-b border-cream-300">
+                                            <div className="flex items-center gap-2">
+                                              <div className="w-1 h-6 bg-gradient-to-b from-cream-600 to-cream-800 rounded-full"></div>
+                                              <h4 className="text-sm font-semibold text-cream-900">
+                                                Subattributes for <span className="text-cream-700 font-bold">"{option.name || 'Option ' + (index + 1)}"</span>
+                                              </h4>
+                                              {option.subattributes && option.subattributes.length > 0 && (
+                                                <span className="px-2 py-0.5 bg-cream-200 text-cream-800 rounded-full text-xs font-medium">
+                                                  {option.subattributes.length} {option.subattributes.length === 1 ? 'subattribute' : 'subattributes'}
+                                                </span>
+                                              )}
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const updated = [...attributeTypeForm.attributeOptionsTable];
+                                                if (!updated[index].subattributes) {
+                                                  updated[index].subattributes = [];
+                                                }
+                                                updated[index].subattributes!.push({ name: "", priceImpactPer1000: "", image: undefined });
+                                                setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
+                                              }}
+                                              className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-cream-700 to-cream-800 text-white rounded-lg hover:from-cream-800 hover:to-cream-900 transition-all duration-200 flex items-center gap-1.5 shadow-sm hover:shadow-md"
+                                            >
+                                              <Plus size={14} className="font-bold" />
+                                              Add Another
+                                            </button>
+                                          </div>
+                                          {(!option.subattributes || option.subattributes.length === 0) ? (
+                                            <div className="text-center py-8 bg-white rounded-lg border-2 border-dashed border-cream-300">
+                                              <div className="flex flex-col items-center gap-2">
+                                                <div className="w-12 h-12 rounded-full bg-cream-100 flex items-center justify-center">
+                                                  <Plus size={20} className="text-cream-600" />
+                                                </div>
+                                                <p className="text-sm font-medium text-cream-700">
+                                                  No subattributes added yet
+                                                </p>
+                                                <p className="text-xs text-cream-500 max-w-xs">
+                                                  Click "Add Subattribute" button above to create subattributes for this option
+                                                </p>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div className="border border-cream-300 rounded-lg overflow-hidden bg-white shadow-sm">
+                                              <div className="overflow-x-auto">
+                                                <table className="w-full border-collapse">
+                                                  <thead>
+                                                    <tr className="bg-gradient-to-r from-cream-100 to-cream-200">
+                                                      <th className="border border-cream-300 px-4 py-2.5 text-left text-xs font-semibold text-cream-900 uppercase tracking-wide">
+                                                        Subattribute Name *
+                                                      </th>
+                                                      <th className="border border-cream-300 px-4 py-2.5 text-left text-xs font-semibold text-cream-900 uppercase tracking-wide">
+                                                        Price Impact (₹ per 1000)
+                                                      </th>
+                                                      <th className="border border-cream-300 px-4 py-2.5 text-left text-xs font-semibold text-cream-900 uppercase tracking-wide">
+                                                        Image (Optional)
+                                                      </th>
+                                                      <th className="border border-cream-300 px-4 py-2.5 text-center text-xs font-semibold text-cream-900 uppercase tracking-wide w-20">
+                                                        Action
+                                                      </th>
+                                                    </tr>
+                                                  </thead>
+                                                  <tbody>
+                                                    {option.subattributes.map((subattr, subIndex) => (
+                                                    <tr key={subIndex} className="hover:bg-cream-50 transition-colors">
+                                                      <td className="border border-cream-300 px-4 py-3">
+                                                        <input
+                                                          type="text"
+                                                          value={subattr.name}
+                                                          onChange={(e) => {
+                                                            const updated = [...attributeTypeForm.attributeOptionsTable];
+                                                            if (!updated[index].subattributes) {
+                                                              updated[index].subattributes = [];
+                                                            }
+                                                            updated[index].subattributes![subIndex].name = e.target.value;
+                                                            setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
+                                                          }}
+                                                          className="w-full px-3 py-2 border border-cream-200 rounded-md text-sm focus:ring-2 focus:ring-cream-500 focus:border-cream-500 transition-all"
+                                                          placeholder="e.g., A1, A2, A3"
+                                                          required
+                                                        />
+                                                      </td>
+                                                      <td className="border border-cream-300 px-4 py-3">
+                                                        <div className="flex items-center gap-2">
+                                                          <span className="text-sm font-medium text-cream-700">₹</span>
+                                                          <input
+                                                            type="number"
+                                                            value={subattr.priceImpactPer1000}
+                                                            onChange={(e) => {
+                                                              const updated = [...attributeTypeForm.attributeOptionsTable];
+                                                              if (!updated[index].subattributes) {
+                                                                updated[index].subattributes = [];
+                                                              }
+                                                              updated[index].subattributes![subIndex].priceImpactPer1000 = e.target.value;
+                                                              setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
+                                                            }}
+                                                            className="w-full px-3 py-2 border border-cream-200 rounded-md text-sm focus:ring-2 focus:ring-cream-500 focus:border-cream-500 transition-all"
+                                                            placeholder="0.00000"
+                                                            step="0.00001"
+                                                            min="0"
+                                                          />
+                                                        </div>
+                                                      </td>
+                                                      <td className="border border-cream-300 px-4 py-3">
+                                                        <div className="space-y-2">
+                                                          <input
+                                                            type="file"
+                                                            accept="image/jpeg,image/jpg,image/png,image/webp"
+                                                            onChange={async (e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (file) {
+                                                              const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+                                                              if (!validTypes.includes(file.type)) {
+                                                                setError("Invalid image format. Please upload JPG, PNG, or WebP image.");
+                                                                return;
+                                                              }
+                                                              if (file.size > 5 * 1024 * 1024) {
+                                                                setError("Image size must be less than 5MB.");
+                                                                return;
+                                                              }
+                                                              
+                                                              try {
+                                                                setLoading(true);
+                                                                const formData = new FormData();
+                                                                formData.append('image', file);
+                                                                
+                                                                const uploadHeaders = getAuthHeaders();
+                                                                delete uploadHeaders['Content-Type']; // Remove Content-Type for FormData
+                                                                const uploadResponse = await fetch(`${API_BASE_URL}/upload-image`, {
+                                                                  method: 'POST',
+                                                                  headers: uploadHeaders,
+                                                                  body: formData,
+                                                                });
+                                                                
+                                                                if (!uploadResponse.ok) {
+                                                                  const errorData = await uploadResponse.json().catch(() => ({}));
+                                                                  throw new Error(errorData.error || 'Failed to upload image');
+                                                                }
+                                                                
+                                                                const uploadData = await uploadResponse.json();
+                                                                const imageUrl = uploadData.url || uploadData.secure_url;
+                                                                
+                                                                if (!imageUrl) {
+                                                                  throw new Error('No image URL returned from server');
+                                                                }
+                                                                
+                                                                const updated = [...attributeTypeForm.attributeOptionsTable];
+                                                                if (!updated[index].subattributes) {
+                                                                  updated[index].subattributes = [];
+                                                                }
+                                                                updated[index].subattributes![subIndex].image = imageUrl;
+                                                                setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
+                                                                setError(null);
+                                                              } catch (err) {
+                                                                console.error("Error uploading image:", err);
+                                                                setError(err instanceof Error ? err.message : "Failed to upload image. Please try again.");
+                                                              } finally {
+                                                                setLoading(false);
+                                                              }
+                                                            }
+                                                          }}
+                                                          className="w-full px-3 py-2 border border-cream-200 rounded-md text-xs focus:ring-2 focus:ring-cream-500 focus:border-cream-500 transition-all file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-cream-100 file:text-cream-700 hover:file:bg-cream-200 cursor-pointer"
+                                                        />
+                                                        {subattr.image && (
+                                                          <div className="flex items-start gap-2 p-2 bg-cream-50 rounded-md border border-cream-200">
+                                                            <img src={subattr.image} alt={subattr.name} className="w-16 h-16 object-cover rounded-md border-2 border-cream-300 shadow-sm" />
+                                                            <button
+                                                              type="button"
+                                                              onClick={() => {
+                                                                const updated = [...attributeTypeForm.attributeOptionsTable];
+                                                                if (!updated[index].subattributes) {
+                                                                  updated[index].subattributes = [];
+                                                                }
+                                                                updated[index].subattributes![subIndex].image = undefined;
+                                                                setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
+                                                              }}
+                                                              className="px-2 py-1 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors border border-red-200"
+                                                            >
+                                                              Remove
+                                                            </button>
+                                                          </div>
+                                                        )}
+                                                        </div>
+                                                      </td>
+                                                      <td className="border border-cream-300 px-4 py-3 text-center">
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => {
+                                                            const updated = [...attributeTypeForm.attributeOptionsTable];
+                                                            if (!updated[index].subattributes) {
+                                                              updated[index].subattributes = [];
+                                                            }
+                                                            updated[index].subattributes = updated[index].subattributes!.filter((_, i) => i !== subIndex);
+                                                            setAttributeTypeForm({ ...attributeTypeForm, attributeOptionsTable: updated });
+                                                          }}
+                                                          className="p-2 text-red-600 hover:bg-red-50 hover:text-red-700 rounded-md transition-all border border-red-200 hover:border-red-300"
+                                                          title="Delete subattribute"
+                                                        >
+                                                          <Trash2 size={16} />
+                                                        </button>
+                                                      </td>
+                                                    </tr>
+                                                  ))}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
+                            );
+                          })}
                               </tbody>
                             </table>
                           </div>
@@ -11875,6 +12489,8 @@ const AdminDashboard: React.FC = () => {
                           <tr>
                             <th className="px-4 py-3 text-left text-sm font-medium text-cream-900">Name</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-cream-900">Input Style</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-cream-900">Options</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-cream-900">Subattributes</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-cream-900">Effect Type</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-cream-900">Pricing</th>
                             <th className="px-4 py-3 text-left text-sm font-medium text-cream-900">Common</th>
@@ -11889,31 +12505,99 @@ const AdminDashboard: React.FC = () => {
                               at.inputStyle?.toLowerCase().includes(attributeTypeSearch.toLowerCase()) ||
                               at.primaryEffectType?.toLowerCase().includes(attributeTypeSearch.toLowerCase())
                             )
-                            .map((at) => (
-                            <tr key={at._id} className="hover:bg-cream-50">
-                              <td className="px-4 py-3 text-sm text-cream-900">{at.attributeName}</td>
-                              <td className="px-4 py-3 text-sm text-cream-600">{at.inputStyle}</td>
-                              <td className="px-4 py-3 text-sm text-cream-600">{at.primaryEffectType}</td>
-                              <td className="px-4 py-3 text-sm text-cream-600">{at.isPricingAttribute ? "Yes" : "No"}</td>
-                              <td className="px-4 py-3 text-sm text-cream-600">{at.isCommonAttribute ? "Yes" : "No"}</td>
-                              <td className="px-4 py-3 text-center">
-                                <div className="flex items-center justify-center gap-2">
-                                  <button
-                                    onClick={() => handleEditAttributeType(at._id)}
-                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                  >
-                                    <Edit size={16} />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteAttributeType(at._id)}
-                                    className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
+                            .map((at) => {
+                              const options = at.attributeValues || [];
+                              const totalSubattributes = options.reduce((sum: number, opt: any) => {
+                                return sum + (opt.subattributes && Array.isArray(opt.subattributes) ? opt.subattributes.length : 0);
+                              }, 0);
+                              
+                              return (
+                              <tr key={at._id} className="hover:bg-cream-50">
+                                <td className="px-4 py-3 text-sm font-medium text-cream-900">{at.attributeName}</td>
+                                <td className="px-4 py-3 text-sm text-cream-600">
+                                  <span className="px-2 py-1 bg-cream-100 text-cream-700 rounded-md text-xs font-medium">
+                                    {at.inputStyle || 'N/A'}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-sm text-cream-600">
+                                  <div className="flex flex-col gap-1">
+                                    <span className="font-medium">{options.length} option{options.length !== 1 ? 's' : ''}</span>
+                                    {options.length > 0 && (
+                                      <div className="text-xs text-cream-500">
+                                        {options.slice(0, 3).map((opt: any, idx: number) => (
+                                          <span key={idx}>
+                                            {opt.label || opt.value}
+                                            {idx < Math.min(2, options.length - 1) && ', '}
+                                          </span>
+                                        ))}
+                                        {options.length > 3 && <span>...</span>}
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 text-sm text-cream-600">
+                                  {totalSubattributes > 0 ? (
+                                    <div className="flex items-center gap-2">
+                                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded-md text-xs font-medium">
+                                        {totalSubattributes} subattribute{totalSubattributes !== 1 ? 's' : ''}
+                                      </span>
+                                      <div className="text-xs text-cream-500">
+                                        {options.map((opt: any, optIdx: number) => {
+                                          const subCount = opt.subattributes && Array.isArray(opt.subattributes) ? opt.subattributes.length : 0;
+                                          if (subCount === 0) return null;
+                                          return (
+                                            <div key={optIdx} className="text-xs">
+                                              <span className="font-medium">{opt.label || opt.value}:</span> {subCount}
+                                            </div>
+                                          );
+                                        }).filter(Boolean).slice(0, 2)}
+                                        {options.filter((opt: any) => opt.subattributes && opt.subattributes.length > 0).length > 2 && '...'}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs text-cream-400">None</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-cream-600">{at.primaryEffectType}</td>
+                                <td className="px-4 py-3 text-sm text-cream-600">
+                                  <span className={`px-2 py-1 rounded-md text-xs font-medium ${
+                                    at.isPricingAttribute 
+                                      ? 'bg-green-100 text-green-700' 
+                                      : 'bg-gray-100 text-gray-600'
+                                  }`}>
+                                    {at.isPricingAttribute ? "Yes" : "No"}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-sm text-cream-600">
+                                  <span className={`px-2 py-1 rounded-md text-xs font-medium ${
+                                    at.isCommonAttribute 
+                                      ? 'bg-blue-100 text-blue-700' 
+                                      : 'bg-gray-100 text-gray-600'
+                                  }`}>
+                                    {at.isCommonAttribute ? "Yes" : "No"}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <button
+                                      onClick={() => handleEditAttributeType(at._id)}
+                                      className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                      title="Edit attribute type"
+                                    >
+                                      <Edit size={16} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteAttributeType(at._id)}
+                                      className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                      title="Delete attribute type"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
